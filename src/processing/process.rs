@@ -32,13 +32,3 @@ pub trait Process: Send + Sync {
     types: &Vec<OutputType>,
   ) -> ProcessResult<()>;
 }
-
-pub(crate) fn process_mime<T, F>(mimetype: &String, block: F) -> ProcessResult<T>
-  where F: Fn(&Box<dyn Process>) -> ProcessResult<T>
-{
-  match mimetype.as_str() {
-    "application/mbox" => block(&mbox_processor()),
-    "message/rfc822" => block(&rfc822_processor()),
-    _ => Err(ProcessError::from("no processor for mimetype"))
-  }
-}

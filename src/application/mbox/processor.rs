@@ -34,15 +34,12 @@ impl MboxProcessor {
     where T: Read,
   {
     let thread_pool = ThreadPool::new(100);
-    let (tx, rx): (Sender<ProcessResult<()>>, Receiver<ProcessResult<()>>) = mpsc::channel();
+    let (tx, rx) = mpsc::channel();
 
     let mut num_threads = 0;
     for message_result in message_iter {
       let message = message_result.map_err(|_| ProcessError::from("failed to parse message from mbox"))?;
-
-      let tx = tx.clone();
-      let output_dir = output_dir.clone();
-      let types = types.clone();
+      let (tx, output_dir, types) = (tx.clone(), output_dir.clone(), types.clone());
 
       thread_pool.execute(move ||
         tx.send(rfc822_processor().handle_raw(message.contents(), &output_dir, &types)).unwrap()
@@ -51,18 +48,14 @@ impl MboxProcessor {
       num_threads += 1;
     }
 
-    let mut success_count = 0;
-    let mut failure_count = 0;
+    let (mut success_count, mut failure_count) = (0, 0);
     for _ in 0..num_threads {
       match rx.recv().unwrap() {
         Ok(_) => success_count += 1,
         Err(_) => failure_count += 1,
       }
-
-      if (success_count + failure_count) % 100 == 0 {
-        println!("{} successful, {} failed", success_count, failure_count);
-      }
     }
+    println!("{} successful, {} failed", success_count, failure_count);
 
     thread_pool.join();
     Ok(())
@@ -76,7 +69,7 @@ impl Process for MboxProcessor {
     output_dir: &PathBuf,
     types: &Vec<OutputType>,
   ) -> ProcessResult<()> {
-    let file= File::open(source_file).map_err(ProcessError::Io)?;
+    let file = File::open(source_file).map_err(ProcessError::Io)?;
     let message_iter = MessageIterator::new(BufReader::new(file));
     self.process(message_iter, output_dir, types)
   }

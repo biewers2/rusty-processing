@@ -1,8 +1,9 @@
 use std::{fs, path, thread};
+use std::path::PathBuf;
 use std::sync::mpsc;
 
 use lazy_static::lazy_static;
-use mail_parser::Message;
+use mail_parser::{Message, MimeHeaders};
 
 use crate::common::error::{ProcessError, ProcessResult};
 use crate::common::output::OutputType;
@@ -11,6 +12,7 @@ use crate::common::workspace::{Workspace, WorkspaceOptions};
 use crate::dupe_id::message_dupe_identifier::message_dupe_identifier;
 use crate::message::rfc822::{metadata, pdf, text};
 use crate::processing::process::{Process, ProcessService};
+use crate::processing::processor::processor;
 
 const FILE_EXT: &str = "eml";
 
@@ -29,7 +31,7 @@ impl Rfc822Processor {
   pub fn process(
     &self,
     message: Message,
-    output_dir: &path::PathBuf,
+    output_dir: &PathBuf,
     types: &Vec<OutputType>,
   ) -> ProcessResult<()> {
     let options = WorkspaceOptions {
@@ -51,41 +53,65 @@ impl Rfc822Processor {
     )?;
 
     let (tx, rx) = mpsc::channel();
+    let (
+      text_tx,
+      metadata_tx,
+      pdf_tx,
+      att_tx
+    ) = (tx.clone(), tx.clone(), tx.clone(), tx.clone());
+    let (output_dir, types) = (output_dir.clone(), types.clone());
 
-    let text_tx = tx.clone();
-    let metadata_tx = tx.clone();
-    let pdf_tx = tx.clone();
+    let thread_count = vec![
+      thread::scope(|_| text_tx.send(self.process_text(&message, text_path)).unwrap()),
+      thread::scope(|_| metadata_tx.send(self.process_metadata(&message, metadata_path)).unwrap()),
+      thread::scope(|_| pdf_tx.send(self.process_pdf(&message, pdf_path)).unwrap()),
+      thread::scope(|_| att_tx.send(self.process_attachments(&message, &output_dir, &types)).unwrap()),
+    ].len();
 
-    thread::scope(|_| {
-      text_tx.send(
-        if let Some(path) = text_path {
-          text::extract(&message, path)
-        } else {
-          Ok(())
-        }
-      ).unwrap();
-    });
-    thread::scope(|_| {
-      metadata_tx.send(
-        if let Some(path) = metadata_path {
-          metadata::extract(&message, path)
-        } else {
-          Ok(())
-        }
-      ).unwrap();
-    });
-    thread::scope(|_| {
-      pdf_tx.send(
-        if let Some(path) = pdf_path {
-          pdf::render(&message, path)
-        } else {
-          Ok(())
-        }
-      ).unwrap();
-    });
-
-    for _ in 0..3 {
+    for _ in 0..thread_count {
       rx.recv().unwrap()?;
+    }
+
+    Ok(())
+  }
+
+  fn process_text(&self, message: &Message, path: Option<PathBuf>) -> ProcessResult<()> {
+    match path {
+      Some(path) => text::extract(message, path),
+      None => Ok(())
+    }
+  }
+
+  fn process_metadata(&self, message: &Message, path: Option<PathBuf>) -> ProcessResult<()> {
+    match path {
+      Some(path) => metadata::extract(message, path),
+      None => Ok(())
+    }
+  }
+
+  fn process_pdf(&self, message: &Message, path: Option<PathBuf>) -> ProcessResult<()> {
+    match path {
+      Some(path) => pdf::render(message, path),
+      None => Ok(())
+    }
+  }
+
+  fn process_attachments(&self, message: &Message, output_dir: &PathBuf, types: &Vec<OutputType>) -> ProcessResult<()> {
+    for part_id in &message.attachments {
+      let part =
+        message.part(*part_id)
+          .ok_or(ProcessError::from("attachment not found"))?;
+
+      let content_type =
+        part.content_type()
+          .ok_or(ProcessError::from("attachment missing content type"))?;
+
+      let mimetype = match (content_type.ctype(), content_type.subtype()) {
+        (ctype, Some(subtype)) => format!("{}/{}", ctype, subtype),
+        (ctype, None) => ctype.to_string()
+      };
+
+      processor().process_raw(part.contents(), output_dir, &mimetype, Some(types))?;
     }
 
     Ok(())
@@ -100,8 +126,8 @@ impl Rfc822Processor {
 impl Process for Rfc822Processor {
   fn handle_file(
     &self,
-    source_file: &path::PathBuf,
-    output_dir: &path::PathBuf,
+    source_file: &PathBuf,
+    output_dir: &PathBuf,
     types: &Vec<OutputType>,
   ) -> ProcessResult<()> {
     let raw = fs::read_to_string(source_file).map_err(ProcessError::Io)?;
@@ -112,7 +138,7 @@ impl Process for Rfc822Processor {
   fn handle_raw(
     &self,
     raw: &[u8],
-    output_dir: &path::PathBuf,
+    output_dir: &PathBuf,
     types: &Vec<OutputType>,
   ) -> ProcessResult<()> {
     self.parse_message(raw)
