@@ -1,8 +1,11 @@
-pub mod mail;
+#![warn(missing_docs)]
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-    }
+pub mod common;
+pub mod processing;
+pub mod dupe_id;
+pub(crate) mod message {
+    pub mod rfc822;
+}
+pub(crate) mod application {
+    pub mod mbox;
 }
