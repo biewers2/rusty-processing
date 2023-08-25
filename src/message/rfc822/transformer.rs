@@ -1,11 +1,9 @@
-use std::borrow::Cow;
-use std::fs::File;
 use std::io::Write;
 
-use mail_parser::{DateTime, Group, HeaderValue, Message, MessagePart, PartType};
+use mail_parser::{HeaderValue, Message, MessagePart, PartType};
 
 use crate::common::error::{ProcessError, ProcessResult};
-use crate::message::rfc822::visitor::MessageVisitor;
+use crate::message::rfc822::message_visitor::MessageVisitor;
 
 const HEADERS: [&str; 6] = ["Date", "From", "To", "CC", "BCC", "Subject"];
 

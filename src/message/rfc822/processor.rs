@@ -1,5 +1,5 @@
 use std::{fs, path, thread};
-use std::sync::Mutex;
+use std::sync::mpsc;
 
 use lazy_static::lazy_static;
 use mail_parser::Message;
@@ -15,7 +15,7 @@ use crate::processing::process::{Process, ProcessService};
 const FILE_EXT: &str = "eml";
 
 lazy_static! {
-  static ref RFC822_PROCESSOR: ProcessService = Mutex::new(Box::<Rfc822Processor>::default());
+  static ref RFC822_PROCESSOR: ProcessService = Box::<Rfc822Processor>::default();
 }
 
 pub fn rfc822_processor() -> &'static ProcessService {
@@ -50,21 +50,43 @@ impl Rfc822Processor {
       options
     )?;
 
+    let (tx, rx) = mpsc::channel();
+
+    let text_tx = tx.clone();
+    let metadata_tx = tx.clone();
+    let pdf_tx = tx.clone();
+
     thread::scope(|_| {
-      if let Some(path) = text_path {
-        text::extract(&message, path).expect("Failed to extract text");
-      }
+      text_tx.send(
+        if let Some(path) = text_path {
+          text::extract(&message, path)
+        } else {
+          Ok(())
+        }
+      ).unwrap();
     });
     thread::scope(|_| {
-      if let Some(path) = metadata_path {
-        metadata::extract(&message, path).expect("Failed to extract metadata");
-      }
+      metadata_tx.send(
+        if let Some(path) = metadata_path {
+          metadata::extract(&message, path)
+        } else {
+          Ok(())
+        }
+      ).unwrap();
     });
     thread::scope(|_| {
-      if let Some(path) = pdf_path {
-        pdf::render(&message, path).expect("Failed to render PDF");
-      }
+      pdf_tx.send(
+        if let Some(path) = pdf_path {
+          pdf::render(&message, path)
+        } else {
+          Ok(())
+        }
+      ).unwrap();
     });
+
+    for _ in 0..3 {
+      rx.recv().unwrap()?;
+    }
 
     Ok(())
   }

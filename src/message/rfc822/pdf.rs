@@ -6,7 +6,7 @@ use mail_parser::Message;
 
 use crate::common::error::{ProcessError, ProcessResult};
 use crate::common::wkhtmltopdf::wkhtmltopdf;
-use crate::message::rfc822::html_visitor::HtmlMessageVisitor;
+use crate::message::rfc822::html_message_visitor::HtmlMessageVisitor;
 use crate::message::rfc822::transformer::MessageTransformer;
 
 pub fn render(message: &Message, output_path: path::PathBuf) -> ProcessResult<()> {
@@ -21,14 +21,14 @@ pub fn render(message: &Message, output_path: path::PathBuf) -> ProcessResult<()
 }
 
 fn render_html_to_pdf(html: Vec<u8>, output: &mut Vec<u8>) -> ProcessResult<()> {
-  wkhtmltopdf().lock().unwrap()
+  wkhtmltopdf()
     .run(html.as_ref(), output)
     .map_err(|err| ProcessError::from_io(err, "Failed to run wkhtmltopdf"))
     .and_then(|status| {
-      if status.success() {
+      if status.success() || status.code().is_some_and(|code| code == 1) {
         Ok(())
       } else {
-        Err(ProcessError::Base(format!("wkhtmltopdf exited with status {}", status)))
+        Err(ProcessError::Unexpected(format!("wkhtmltopdf exited with status {}", status)))
       }
     })
 }

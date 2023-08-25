@@ -1,10 +1,9 @@
-use std::fmt::format;
 use std::fs::File;
 use std::io::Write;
 use std::path;
 use json::object;
 
-use mail_parser::{ContentType, Message, MimeHeaders};
+use mail_parser::{Message, MimeHeaders};
 
 use crate::common::error::{ProcessError, ProcessResult};
 

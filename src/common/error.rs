@@ -6,14 +6,15 @@ pub type ProcessResult<T> = Result<T, ProcessError>;
 
 #[derive(Debug)]
 pub enum ProcessError {
-  Base(String),
+  Unexpected(String),
+  Duplicate,
   Trace(Box<ProcessError>, String),
   Io(io::Error),
 }
 
 impl ProcessError {
   pub fn from(message: &str) -> Self {
-    Self::Base(message.to_string())
+    Self::Unexpected(message.to_string())
   }
 
   pub fn from_io(err: io::Error, message: &str) -> Self {
@@ -24,7 +25,8 @@ impl ProcessError {
 impl Display for ProcessError {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     match self {
-      ProcessError::Base(msg) => writeln!(f, "{}", msg),
+      ProcessError::Unexpected(msg) => writeln!(f, "{}", msg),
+      ProcessError::Duplicate => writeln!(f, "Duplicate"),
       ProcessError::Trace(err, msg) => writeln!(f, "{}: {}", msg, err),
       ProcessError::Io(err) => Display::fmt(&err, f)
     }
@@ -34,7 +36,7 @@ impl Display for ProcessError {
 impl Error for ProcessError {
   fn cause(&self) -> Option<&dyn Error> {
     match self {
-      ProcessError::Base(_) => None,
+      ProcessError::Unexpected(_) | ProcessError::Duplicate => None,
       ProcessError::Trace(err, _) => Some(err),
       ProcessError::Io(err) => Some(err)
     }

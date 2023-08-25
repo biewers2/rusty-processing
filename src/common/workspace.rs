@@ -26,11 +26,11 @@ pub fn create_from_raw(
   raw: &Cow<[u8]>,
   options: WorkspaceOptions,
 ) -> ProcessResult<Workspace> {
-  let dupe_id = options.dupe_identifier.lock().unwrap().identify(&raw);
+  let dupe_id = options.dupe_identifier.identify(&raw);
 
   let file_output_dir = options.output_dir.join(&dupe_id);
   fs::create_dir(&file_output_dir)
-    .map_err(|err| ProcessError::from_io(err, "Failed to create output directory"))?;
+    .map_err(|err| ProcessError::Duplicate)?;
 
   let original_path = file_output_dir.join(format!("original.{}", options.file_ext));
   File::create(&original_path)

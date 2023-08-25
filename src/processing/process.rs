@@ -1,5 +1,4 @@
 use std::path;
-use std::sync::Mutex;
 use crate::application::mbox::processor::mbox_processor;
 
 use crate::common::error::{ProcessError, ProcessResult};
@@ -16,9 +15,9 @@ pub(super) fn default_types() -> Vec<OutputType> {
   return TYPES.to_vec()
 }
 
-type ProcessService = Mutex<Box<dyn Process>>;
+pub type ProcessService = Box<dyn Process>;
 
-pub trait Process: Send {
+pub trait Process: Send + Sync {
   fn handle_file(
     &self,
     source_file: &path::PathBuf,
@@ -38,8 +37,8 @@ pub(crate) fn process_mime<T, F>(mimetype: &String, block: F) -> ProcessResult<T
   where F: Fn(&Box<dyn Process>) -> ProcessResult<T>
 {
   match mimetype.as_str() {
-    "application/mbox" => block(&mbox_processor().lock().unwrap()),
-    "message/rfc822" => block(&rfc822_processor().lock().unwrap()),
+    "application/mbox" => block(&mbox_processor()),
+    "message/rfc822" => block(&rfc822_processor()),
     _ => Err(ProcessError::from("no processor for mimetype"))
   }
 }

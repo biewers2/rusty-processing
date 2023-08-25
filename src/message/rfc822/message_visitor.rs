@@ -20,8 +20,8 @@ pub trait MessageVisitor {
   fn on_header_content_type(&self, content_type: &ContentType) -> Option<String>;
 
   // Body part visitors
-  fn on_part_text(&self, value: &Cow<str>) -> String;
-  fn on_part_html(&self, value: &Cow<str>) -> String;
-  fn on_part_binary(&self, value: &Cow<[u8]>) -> Vec<u8>;
-  fn on_part_inline_binary(&self, value: &Cow<[u8]>) -> Vec<u8>;
+  fn on_part_text(&self, value: &Cow<str>) -> String { value.to_string() }
+  fn on_part_html(&self, value: &Cow<str>) -> String { value.to_string() }
+  fn on_part_binary(&self, value: &Cow<[u8]>) -> Vec<u8> { value.to_vec() }
+  fn on_part_inline_binary(&self, value: &Cow<[u8]>) -> Vec<u8> { value.to_vec() }
 }

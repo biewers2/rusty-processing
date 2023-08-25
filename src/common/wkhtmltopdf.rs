@@ -1,7 +1,6 @@
 use std::{io, thread};
 use std::io::{Read, Write};
-use std::process::{Child, Command, ExitStatus, Stdio};
-use std::sync::Mutex;
+use std::process::{Command, ExitStatus, Stdio};
 use lazy_static::lazy_static;
 
 const DEFAULT_ARGS: [&str; 15] = [
@@ -19,10 +18,10 @@ const DEFAULT_ARGS: [&str; 15] = [
   "-", "-"
 ];
 
-pub type WkhtmltopdfService = Mutex<Box<Wkhtmltopdf>>;
+pub type WkhtmltopdfService = Box<Wkhtmltopdf>;
 
 lazy_static! {
-  static ref WKHTMLTOPDF: WkhtmltopdfService = Mutex::new(Box::<Wkhtmltopdf>::default());
+  static ref WKHTMLTOPDF: WkhtmltopdfService = Box::<Wkhtmltopdf>::default();
 }
 
 pub fn wkhtmltopdf() -> &'static WkhtmltopdfService {
@@ -39,7 +38,7 @@ impl Wkhtmltopdf {
         .args(&DEFAULT_ARGS)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::null())
         .spawn()?;
 
     let mut stdin = proc.stdin.take();

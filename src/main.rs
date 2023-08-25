@@ -63,7 +63,6 @@ fn parse_directory_path(path_str: &str) -> Result<path::PathBuf, String> {
 
 fn main() -> ProcessResult<()> {
   let args = Args::parse();
-  let processor = processor().lock().unwrap();
   let types =
     if args.types.is_empty() {
       None
@@ -71,7 +70,7 @@ fn main() -> ProcessResult<()> {
       Some(&args.types)
     };
 
-  processor
+  processor()
     .process_file(
       &args.input,
       &args.output,

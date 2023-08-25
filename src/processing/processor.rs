@@ -1,5 +1,4 @@
 use std::path;
-use std::sync::Mutex;
 use lazy_static::lazy_static;
 
 use crate::common::error::ProcessResult;
@@ -7,13 +6,14 @@ use crate::common::output::OutputType;
 use crate::processing::process::{default_types, process_mime};
 
 lazy_static! {
-  static ref PROCESSOR: Mutex<Processor> = Mutex::new(Processor {});
+  static ref PROCESSOR: Processor = Processor::default();
 }
 
-pub fn processor() -> &'static Mutex<Processor> {
+pub fn processor() -> &'static Processor {
   &PROCESSOR
 }
 
+#[derive(Default)]
 pub struct Processor {}
 
 impl Processor {
