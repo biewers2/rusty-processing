@@ -1,86 +1,66 @@
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
-use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
 
-use lazy_static::lazy_static;
-use mail_parser::mailbox::mbox::{Message, MessageIterator};
+use mail_parser::mailbox::mbox::MessageIterator;
 use threadpool::ThreadPool;
 
-use crate::common::error::{ProcessError, ProcessResult};
-use crate::common::output::OutputType;
-use crate::message::rfc822::processor::rfc822_processor;
-use crate::processing::process::{Process, ProcessService};
+use crate::common::error::ProcessError;
+use crate::processing::context::Context;
+use crate::processing::process::Process;
+use crate::processing::processor::processor;
 
-lazy_static! {
-  static ref MBOX_PROCESSOR: ProcessService = Box::<MboxProcessor>::default();
+pub struct MboxProcessor {
+    pub(super) context: Context,
 }
-
-pub fn mbox_processor() -> &'static ProcessService {
-  &MBOX_PROCESSOR
-}
-
-#[derive(Default)]
-pub struct MboxProcessor {}
 
 impl MboxProcessor {
-  pub fn process<T>(
-    &self,
-    message_iter: MessageIterator<BufReader<T>>,
-    output_dir: &PathBuf,
-    types: &Vec<OutputType>,
-  ) -> ProcessResult<()>
-    where T: Read,
-  {
-    let thread_pool = ThreadPool::new(100);
-    let (tx, rx) = mpsc::channel();
-
-    let mut num_threads = 0;
-    for message_result in message_iter {
-      let message = message_result.map_err(|_| ProcessError::from("failed to parse message from mbox"))?;
-      let (tx, output_dir, types) = (tx.clone(), output_dir.clone(), types.clone());
-
-      thread_pool.execute(move ||
-        tx.send(rfc822_processor().handle_raw(message.contents(), &output_dir, &types)).unwrap()
-      );
-
-      num_threads += 1;
+    pub fn new(context: Context) -> Self {
+        Self { context }
     }
 
-    let (mut success_count, mut failure_count) = (0, 0);
-    for _ in 0..num_threads {
-      match rx.recv().unwrap() {
-        Ok(_) => success_count += 1,
-        Err(_) => failure_count += 1,
-      }
-    }
-    println!("{} successful, {} failed", success_count, failure_count);
+    pub fn process<T: Read>(&self, message_iter: MessageIterator<BufReader<T>>) {
+        let thread_pool = ThreadPool::new(100);
 
-    thread_pool.join();
-    Ok(())
-  }
+        for message_result in message_iter {
+            match message_result {
+                Ok(message) => {
+                    let context = self.context.clone();
+                    thread_pool.execute(move || {
+                        processor().process_raw(
+                            message.contents(),
+                            context.output_dir.clone(),
+                            "message/rfc822".to_string(),
+                            context.types.clone(),
+                            move |result| context.send_result(result),
+                        );
+                    });
+                }
+                Err(_) => self.context.send_result(Err(ProcessError::unexpected(
+                    &self.context,
+                    "failed to parse message from mbox",
+                ))),
+            }
+        }
+
+        thread_pool.join();
+    }
 }
 
 impl Process for MboxProcessor {
-  fn handle_file(
-    &self,
-    source_file: &PathBuf,
-    output_dir: &PathBuf,
-    types: &Vec<OutputType>,
-  ) -> ProcessResult<()> {
-    let file = File::open(source_file).map_err(ProcessError::Io)?;
-    let message_iter = MessageIterator::new(BufReader::new(file));
-    self.process(message_iter, output_dir, types)
-  }
+    fn handle_file(&self, source_file: &PathBuf) {
+        let result = File::open(source_file)
+            .map(|file| MessageIterator::new(BufReader::new(file)))
+            .map(|message_iter| self.process(message_iter))
+            .map_err(|err| ProcessError::io(&self.context, err));
 
-  fn handle_raw(
-    &self,
-    raw: &[u8],
-    output_dir: &PathBuf,
-    types: &Vec<OutputType>,
-  ) -> ProcessResult<()> {
-    let message_iter = MessageIterator::new(BufReader::new(raw));
-    self.process(message_iter, output_dir, types)
-  }
+        if result.is_err() {
+            self.context.send_result(result);
+        }
+    }
+
+    fn handle_raw(&self, raw: &[u8]) {
+        let message_iter = MessageIterator::new(BufReader::new(raw));
+        self.process(message_iter);
+    }
 }

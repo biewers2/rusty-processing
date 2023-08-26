@@ -1,34 +1,23 @@
 use std::path;
-use crate::application::mbox::processor::mbox_processor;
 
-use crate::common::error::{ProcessError, ProcessResult};
-use crate::common::output::OutputType;
-use crate::message::rfc822::processor::rfc822_processor;
-
-const TYPES: [OutputType; 3] = [
-  OutputType::Metadata,
-  OutputType::Text,
-  OutputType::Pdf
-];
-
-pub(super) fn default_types() -> Vec<OutputType> {
-  return TYPES.to_vec()
-}
-
-pub type ProcessService = Box<dyn Process>;
-
+/// Process is a trait that defines the interface for processing data from a file or as raw bytes.
+///
+/// Process implementations are required to be thread safe.
+///
 pub trait Process: Send + Sync {
-  fn handle_file(
-    &self,
-    source_file: &path::PathBuf,
-    output_dir: &path::PathBuf,
-    types: &Vec<OutputType>,
-  ) -> ProcessResult<()>;
+    /// Handle a file.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_file` - The path to the file to process.
+    ///
+    fn handle_file(&self, source_file: &path::PathBuf);
 
-  fn handle_raw(
-    &self,
-    raw: &[u8],
-    output_dir: &path::PathBuf,
-    types: &Vec<OutputType>,
-  ) -> ProcessResult<()>;
+    /// Handle raw bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `raw` - The raw bytes to process.
+    ///
+    fn handle_raw(&self, raw: &[u8]);
 }
