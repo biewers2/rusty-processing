@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{mpsc, Mutex};
 use std::{path, thread};
 use std::borrow::Cow;
 use anyhow::anyhow;
@@ -60,7 +60,7 @@ impl Processor {
             output_dir,
             mimetype,
             types,
-            result_tx: Some(tx),
+            result_tx: Mutex::new(Some(tx)),
         };
 
         thread::spawn(move || loop {
@@ -100,7 +100,7 @@ impl Processor {
             output_dir,
             mimetype,
             types,
-            result_tx: Some(tx),
+            result_tx: Mutex::new(Some(tx)),
         };
 
         thread::scope(|s| {

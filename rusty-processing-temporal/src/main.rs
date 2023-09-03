@@ -1,17 +1,15 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use aws_sdk_s3 as s3;
 use temporal_sdk::{sdk_client_options, Worker};
 use temporal_sdk_core::{CoreRuntime, init_worker};
 use temporal_sdk_core_api::telemetry::TelemetryOptionsBuilder;
 use temporal_sdk_core_api::worker::WorkerConfigBuilder;
-use tokio::sync::Mutex;
 use url::Url;
+
 use rusty_processing_temporal::activities::create_workspace::create_workspace;
 use rusty_processing_temporal::activities::destroy_workspace::destroy_workspace;
 use rusty_processing_temporal::activities::download::download;
-
 use rusty_processing_temporal::activities::process_rusty_file::process_rusty_file;
 use rusty_processing_temporal::activities::upload::upload;
 

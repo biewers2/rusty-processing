@@ -5,7 +5,7 @@ use std::path;
 ///
 /// Process implementations are required to be thread safe.
 ///
-pub trait Process: Send + Sync {
+pub trait Process: Send {
     /// Handle a file.
     ///
     /// # Arguments

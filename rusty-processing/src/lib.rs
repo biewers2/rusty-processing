@@ -1,11 +1,10 @@
+#![warn(missing_docs)]
 //!
 //! Library for processing files
 //!
 //! This library provides a framework for processing files. It also provides a default processor that can be used
 //! in applications.
 //!
-
-#![warn(missing_docs)]
 
 /// Common functionality across the library
 ///

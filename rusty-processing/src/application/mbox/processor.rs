@@ -3,6 +3,7 @@ use std::thread;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::thread::Scope;
 use anyhow::anyhow;
 
@@ -43,7 +44,7 @@ impl MboxProcessor {
             output_dir: self.context.output_dir.clone(),
             types: vec![],
             mimetype: "message/rfc822".to_string(),
-            result_tx: None,
+            result_tx: Mutex::new(None),
         };
 
         let wkspace = Workspace::new(&context, &message.contents())?;
