@@ -1,6 +1,6 @@
 use std::{fs, path};
 use serde::{Deserialize, Serialize};
-use tempfile::{NamedTempFile, tempdir, tempfile_in};
+
 use temporal_sdk::ActContext;
 
 #[derive(Deserialize, Debug)]
