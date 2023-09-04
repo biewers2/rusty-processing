@@ -2,7 +2,7 @@ use std::path;
 use std::sync::mpsc;
 
 use crate::common::output_type::ProcessType;
-use crate::processing::output::{Output, OutputInfo};
+use crate::processing::output::{Output};
 
 /// Structure defining the context for a processing operation.
 ///

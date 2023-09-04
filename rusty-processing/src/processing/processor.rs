@@ -9,7 +9,7 @@ use crate::application::mbox::processor::MboxProcessor;
 use crate::common::output_type::ProcessType;
 use crate::message::rfc822::processor::Rfc822Processor;
 use crate::processing::context::Context;
-use crate::processing::output::{Output, OutputInfo};
+use crate::processing::output::{Output};
 use crate::processing::process::Process;
 
 lazy_static! {

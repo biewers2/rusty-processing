@@ -1,4 +1,4 @@
-use std::io::{self};
+
 use std::path;
 
 use crate::common::mime_extension_map::map_to_file_ext;

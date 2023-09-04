@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use std::io::{Read, Write};
 use std::process::{Command, ExitStatus, Stdio};
-use std::{io, thread};
+use std::{thread};
 
 const DEFAULT_ARGS: [&str; 15] = [
     "--quiet",

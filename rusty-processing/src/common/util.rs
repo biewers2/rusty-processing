@@ -2,7 +2,7 @@ use mail_parser::ContentType;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use std::{fs, io};
+use std::{fs};
 
 use uuid::Uuid;
 

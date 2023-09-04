@@ -1,4 +1,4 @@
-use std::{io, path};
+use std::{path};
 use std::fs::File;
 
 use mail_parser::Message;
