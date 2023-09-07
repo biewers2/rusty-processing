@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use std::{fs, path, thread};
+use std::borrow::Cow;
 
 use anyhow::anyhow;
 use mail_parser::{Message, MimeHeaders};
@@ -19,69 +19,83 @@ impl Rfc822Processor {
         Self { context }
     }
 
+    /// Processes a message by extracting text and metadata, rendering a PDF, and then finding any embedded attachments.
+    ///
     pub fn process(&self, message: Message) {
-        if let Err(err) = self.process_with_result(message) {
-            self.context.send_result(Err(err));
-        }
-    }
-
-    fn process_with_result(&self, message: Message) -> anyhow::Result<()> {
-        let wkspace = Workspace::new(&self.context, &message.raw_message)?;
+        let wkspace = match Workspace::new(&self.context, &message.raw_message) {
+            Ok(ws) => ws,
+            Err(e) => {
+                self.context.send_result(Err(e));
+                return;
+            }
+        };
 
         thread::scope(|s| {
-            let text_path = wkspace.text_path;
-            let dupe_id = wkspace.dupe_id.clone();
-            s.spawn(|| {
-                if let Some(path) = text_path {
-                    self.context
-                        .send_result(self.extract_text(&message, &path).map(|_| {
-                            Output::Processed(OutputInfo {
-                                path,
-                                mimetype: "text/plain".to_string(),
-                                dupe_id,
-                            })
-                        }));
-                }
+            s.spawn(|| if let Err(e) = self.process_text(&message, &wkspace) {
+                self.context.send_result(Err(e)); 
             });
-
-            let metadata_path = wkspace.metadata_path;
-            let dupe_id = wkspace.dupe_id.clone();
-            s.spawn(|| {
-                if let Some(path) = metadata_path {
-                    self.context
-                        .send_result(self.extract_metadata(&message, &path).map(|_| {
-                            Output::Processed(OutputInfo {
-                                path,
-                                mimetype: "application/json".to_string(),
-                                dupe_id,
-                            })
-                        }));
-                }
+            s.spawn(|| if let Err(e) = self.process_metadata(&message, &wkspace) {
+                self.context.send_result(Err(e));
             });
-
-            let pdf_path = wkspace.pdf_path;
-            let dupe_id = wkspace.dupe_id.clone();
-            s.spawn(|| {
-                if let Some(path) = pdf_path {
-                    self.context
-                        .send_result(self.render_pdf(&message, &path).map(|_| {
-                            Output::Processed(OutputInfo {
-                                path,
-                                mimetype: "application/pdf".to_string(),
-                                dupe_id,
-                            })
-                        }));
-                }
+            s.spawn(|| if let Err(e) = self.process_pdf(&message, &wkspace) {
+                self.context.send_result(Err(e));
             });
-
-            if let Err(err) = self.process_attachments(&message) {
-                self.context.send_result(Err(err));
+            if let Err(e) = self.process_attachments(&message) {
+                self.context.send_result(Err(e));
             }
         });
+    }
 
+    /// Extracts the text from the message and emits it as processed output.
+    ///
+    fn process_text(&self, message: &Message, wkspace: &Workspace) -> anyhow::Result<()> {
+        if let (Some(path), Some(mut writer)) = (&wkspace.text_path, wkspace.text_writer()?) {
+            let output = self.extract_text(&message, &mut writer).map(|_| {
+                Output::Processed(OutputInfo {
+                    path: path.to_owned(),
+                    mimetype: "text/plain".to_string(),
+                    dupe_id: wkspace.dupe_id.to_owned(),
+                })
+            });
+            self.context.send_result(output);
+        }
         Ok(())
     }
 
+    /// Extracts the metadata from the message and emits it as processed output.
+    ///
+    fn process_metadata(&self, message: &Message, wkspace: &Workspace) -> anyhow::Result<()> {
+        if let (Some(path), Some(mut writer)) = (&wkspace.metadata_path, wkspace.metadata_writer()?) {
+            let output = self.extract_metadata(&message, &mut writer).map(|_| {
+                Output::Processed(OutputInfo {
+                    path: path.to_owned(),
+                    mimetype: "application/json".to_string(),
+                    dupe_id: wkspace.dupe_id.to_owned(),
+                })
+            });
+            self.context.send_result(output);
+        }
+        Ok(())
+    }
+
+    /// Renders a PDF from the message and emits it as processed output.
+    ///
+    fn process_pdf(&self, message: &Message, wkspace: &Workspace) -> anyhow::Result<()> {
+        if let (Some(path), Some(mut writer)) = (&wkspace.pdf_path, wkspace.pdf_writer()?) {
+            let output = self.render_pdf(&message, &mut writer).map(|_| {
+                Output::Processed(OutputInfo {
+                    path: path.to_owned(),
+                    mimetype: "application/pdf".to_string(),
+                    dupe_id: wkspace.dupe_id.to_owned(),
+                })
+            });
+            self.context.send_result(output);
+        }
+        Ok(())
+    }
+
+    /// Discovers any attachments in the message and emits them as embedded output.
+    ///
     fn process_attachments(&self, message: &Message) -> anyhow::Result<()> {
         for part_id in &message.attachments {
             let part = message

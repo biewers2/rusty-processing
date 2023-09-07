@@ -115,8 +115,6 @@ impl MessageFormatter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::anyhow;
-    use std::collections::HashMap;
 
     fn addr<'a>(name: &'a str, address: &'a str) -> Addr<'a> {
         Addr {

@@ -1,4 +1,7 @@
+use std::fs::File;
+use std::io::Write;
 use std::path;
+use std::path::PathBuf;
 
 use crate::common::mime_extension_map::map_to_file_ext;
 use crate::common::output_type::ProcessType;
@@ -67,6 +70,30 @@ impl Workspace {
             metadata_path,
             pdf_path,
         })
+    }
+
+    /// Creates a writer for the extracted text to be written to.
+    /// 
+    pub fn text_writer(&self) -> anyhow::Result<Option<Box<dyn Write>>> {
+        self.writer(&self.text_path)
+    }
+    
+    /// Creates a writer for the metadata JSON to be written to.
+    /// 
+    pub fn metadata_writer(&self) -> anyhow::Result<Option<Box<dyn Write>>> {
+        self.writer(&self.metadata_path)
+    }
+    
+    /// Creates a writer for the rendered PDF to be written to.
+    /// 
+    pub fn pdf_writer(&self) -> anyhow::Result<Option<Box<dyn Write>>> {
+        self.writer(&self.pdf_path)
+    }
+    
+    fn writer(&self, path: &Option<PathBuf>) -> anyhow::Result<Option<Box<dyn Write>>> {
+        Ok(path.as_ref()
+            .map(|path| File::create(&path)).transpose()?
+            .map(|file| Box::new(file) as Box<dyn Write>))
     }
 }
 
