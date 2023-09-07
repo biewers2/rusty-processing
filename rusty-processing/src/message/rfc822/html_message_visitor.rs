@@ -1,10 +1,12 @@
-use html_escape::encode_text;
 use std::borrow::Cow;
 
-use crate::message::rfc822::message_formatter::MessageFormatter;
+use html_escape::encode_text;
 use mail_parser::{Addr, ContentType, DateTime, Group};
 
+use crate::message::rfc822::message_formatter::MessageFormatter;
 use crate::message::rfc822::message_visitor::MessageVisitor;
+
+const HEADERS: [&str; 6] = ["Date", "From", "To", "CC", "BCC", "Subject"];
 
 #[derive(Default)]
 pub struct HtmlMessageVisitor {
@@ -57,7 +59,7 @@ impl MessageVisitor for HtmlMessageVisitor {
     }
 
     fn on_header_text(&self, name: &str, text: &Cow<str>) -> Option<String> {
-        Some(format!("<b>{}</b>: {}", name, encode_text(text)))
+        HEADERS.contains(&name).then_some(format!("<b>{}</b>: {}", name, encode_text(text)))
     }
 
     fn on_header_text_list(&self, name: &str, text_list: &Vec<Cow<str>>) -> Option<String> {
@@ -84,5 +86,40 @@ impl MessageVisitor for HtmlMessageVisitor {
             .map(|line| format!("<p>{}</p>", encode_text(line)))
             .collect::<Vec<String>>()
             .join("\n")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use anyhow::anyhow;
+    use mail_parser::Message;
+
+    use crate::message::rfc822::transformer::MessageTransformer;
+    use crate::test_util;
+
+    use super::*;
+
+    #[test]
+    fn test_text_message_visitor() -> anyhow::Result<()> {
+        let content = test_util::read_contents("resources/rfc822/headers-small.eml")?;
+        let message = Message::parse(&content).ok_or(anyhow!("Failed to parse message"))?;
+        let visitor = Box::<HtmlMessageVisitor>::default();
+        let transformer = MessageTransformer::new(visitor);
+
+        let mut content = vec![];
+        transformer.transform(&message, &mut content)?;
+
+        let expected_content = "\
+<div><b>Date</b>: 2021-02-21T07:58:00-08:00</div>
+<div><b>From</b>: &lt;rusty.processing@mime.com&gt;</div>
+<div><b>To</b>: &lt;processing.rusty@emim.com&gt;</div>
+<div><b>Subject</b>: Now THATS A LOT OF RUST</div>
+<br>
+<div><p>This is a rusty email</p>
+<p></p>
+<p>;)</p>
+<p></p></div>";
+        assert_eq!(expected_content, String::from_utf8(content)?);
+        Ok(())
     }
 }

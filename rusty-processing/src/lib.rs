@@ -28,3 +28,6 @@ pub(crate) mod message {
 pub(crate) mod application {
     pub mod mbox;
 }
+
+#[cfg(test)]
+pub mod test_util;

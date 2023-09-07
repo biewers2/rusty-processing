@@ -1,4 +1,3 @@
-
 /// Defines the possible outputs for processed files.
 ///
 pub mod output_type;

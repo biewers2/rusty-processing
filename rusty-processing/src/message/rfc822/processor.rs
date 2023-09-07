@@ -1,5 +1,5 @@
-use std::{fs, path, thread};
 use std::borrow::Cow;
+use std::{fs, path, thread};
 
 use anyhow::anyhow;
 use mail_parser::{Message, MimeHeaders};
@@ -20,9 +20,9 @@ impl Rfc822Processor {
     }
 
     pub fn process(&self, message: Message) {
-        self.process_with_result(message).map_err(|err| {
+        if let Err(err) = self.process_with_result(message) {
             self.context.send_result(Err(err));
-        });
+        }
     }
 
     fn process_with_result(&self, message: Message) -> anyhow::Result<()> {
@@ -33,14 +33,14 @@ impl Rfc822Processor {
             let dupe_id = wkspace.dupe_id.clone();
             s.spawn(|| {
                 if let Some(path) = text_path {
-                    self.context.send_result(
-                    self.extract_text(&message, &path)
-                        .map(|_| Output::Processed(OutputInfo {
-                            path,
-                            mimetype: "text/plain".to_string(),
-                            dupe_id,
-                        }))
-                    );
+                    self.context
+                        .send_result(self.extract_text(&message, &path).map(|_| {
+                            Output::Processed(OutputInfo {
+                                path,
+                                mimetype: "text/plain".to_string(),
+                                dupe_id,
+                            })
+                        }));
                 }
             });
 
@@ -48,14 +48,14 @@ impl Rfc822Processor {
             let dupe_id = wkspace.dupe_id.clone();
             s.spawn(|| {
                 if let Some(path) = metadata_path {
-                    self.context.send_result(
-                        self.extract_metadata(&message, &path)
-                            .map(|_| Output::Processed(OutputInfo {
+                    self.context
+                        .send_result(self.extract_metadata(&message, &path).map(|_| {
+                            Output::Processed(OutputInfo {
                                 path,
                                 mimetype: "application/json".to_string(),
                                 dupe_id,
-                            }))
-                    );
+                            })
+                        }));
                 }
             });
 
@@ -63,14 +63,14 @@ impl Rfc822Processor {
             let dupe_id = wkspace.dupe_id.clone();
             s.spawn(|| {
                 if let Some(path) = pdf_path {
-                    self.context.send_result(
-                        self.render_pdf(&message, &path)
-                            .map(|_| Output::Processed(OutputInfo {
+                    self.context
+                        .send_result(self.render_pdf(&message, &path).map(|_| {
+                            Output::Processed(OutputInfo {
                                 path,
                                 mimetype: "application/pdf".to_string(),
                                 dupe_id,
-                            }))
-                    );
+                            })
+                        }));
                 }
             });
 
@@ -84,17 +84,20 @@ impl Rfc822Processor {
 
     fn process_attachments(&self, message: &Message) -> anyhow::Result<()> {
         for part_id in &message.attachments {
-            let part = message.part(*part_id).ok_or(anyhow!("failed to get attachment part"))?;
-            let content_type = part.content_type().ok_or(anyhow!("failed to get attachment content type"))?;
+            let part = message
+                .part(*part_id)
+                .ok_or(anyhow!("failed to get attachment part"))?;
+            let content_type = part
+                .content_type()
+                .ok_or(anyhow!("failed to get attachment content type"))?;
             let mimetype = mimetype(content_type);
             let wkspace = Workspace::new(&self.context.with_mimetype(&mimetype), &part.contents())?;
 
-            self.context
-                .send_result(Ok(Output::Embedded(OutputInfo {
-                    path: wkspace.original_path,
-                    mimetype,
-                    dupe_id: wkspace.dupe_id,
-                })));
+            self.context.send_result(Ok(Output::Embedded(OutputInfo {
+                path: wkspace.original_path,
+                mimetype,
+                dupe_id: wkspace.dupe_id,
+            })));
         }
         Ok(())
     }
@@ -107,7 +110,8 @@ impl Process for Rfc822Processor {
                 .map(|message| self.process(message))
                 .unwrap_or_else(|err| self.context.send_result(Err(err)));
         } else {
-            self.context.send_result(Err(anyhow!("failed to read file: {:?}", source_file)));
+            self.context
+                .send_result(Err(anyhow!("failed to read file: {:?}", source_file)));
         }
     }
 

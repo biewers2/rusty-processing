@@ -1,9 +1,11 @@
-use crate::dupe_id::identify_dupe::{IdentifyDupe, IdentifyDupeService};
-use crate::dupe_id::md5_dupe_identifier::md5_dupe_identifier;
+use std::borrow::Cow;
+
 use lazy_static::lazy_static;
 use mail_parser::Message;
-use std::borrow::Cow;
 use uuid::Uuid;
+
+use crate::dupe_id::identify_dupe::{IdentifyDupe, IdentifyDupeService};
+use crate::dupe_id::md5_dupe_identifier::md5_dupe_identifier;
 
 lazy_static! {
     static ref MESSAGE_DUPE_IDENTIFIER: IdentifyDupeService =
@@ -31,5 +33,20 @@ impl IdentifyDupe for MessageDupeIdentifier {
             .unwrap_or_else(|| Cow::from(Uuid::new_v4().as_ref().to_owned()));
 
         md5_dupe_identifier().identify(&raw_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::any::{Any, TypeId};
+
+    use super::*;
+
+    #[test]
+    fn check_message_dupe_identifier_singleton() {
+        assert_eq!(
+            message_dupe_identifier().type_id(),
+            TypeId::of::<IdentifyDupeService>()
+        );
     }
 }

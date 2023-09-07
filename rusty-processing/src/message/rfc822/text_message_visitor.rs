@@ -1,7 +1,11 @@
+use std::borrow::Cow;
+
+use mail_parser::{Addr, ContentType, DateTime, Group};
+
 use crate::message::rfc822::message_formatter::MessageFormatter;
 use crate::message::rfc822::message_visitor::MessageVisitor;
-use mail_parser::{Addr, ContentType, DateTime, Group};
-use std::borrow::Cow;
+
+const HEADERS: [&str; 6] = ["Date", "From", "To", "CC", "BCC", "Subject"];
 
 #[derive(Default)]
 pub struct TextMessageVisitor {
@@ -38,7 +42,7 @@ impl MessageVisitor for TextMessageVisitor {
     }
 
     fn on_header_text(&self, name: &str, text: &Cow<str>) -> Option<String> {
-        Some(format!("{}: {}", name, text))
+        HEADERS.contains(&name).then_some(format!("{}: {}", name, text))
     }
 
     fn on_header_text_list(&self, name: &str, text_list: &Vec<Cow<str>>) -> Option<String> {
@@ -57,5 +61,38 @@ impl MessageVisitor for TextMessageVisitor {
 
     fn on_part_html(&self, value: &Cow<str>) -> String {
         html2text::from_read(value.as_bytes(), 120)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use anyhow::anyhow;
+    use mail_parser::Message;
+    use crate::message::rfc822::transformer::MessageTransformer;
+    use crate::test_util;
+    use super::*;
+
+    #[test]
+    fn test_text_message_visitor() -> anyhow::Result<()> {
+        let content = test_util::read_contents("resources/rfc822/headers-small.eml")?;
+        let message = Message::parse(&content).ok_or(anyhow!("Failed to parse message"))?;
+        let visitor = Box::<TextMessageVisitor>::default();
+        let transformer = MessageTransformer::new(visitor);
+
+        let mut content = vec![];
+        transformer.transform(&message, &mut content)?;
+
+        let expected_content = "\
+Date: 2021-02-21T07:58:00-08:00
+From: <rusty.processing@mime.com>
+To: <processing.rusty@emim.com>
+Subject: Now THATS A LOT OF RUST
+
+This is a rusty email
+
+;)
+";
+        assert_eq!(expected_content, String::from_utf8(content)?);
+        Ok(())
     }
 }

@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use std::io::{Read, Write};
 use std::process::{Command, ExitStatus, Stdio};
-use std::{thread};
+use std::thread;
 
 const DEFAULT_ARGS: [&str; 15] = [
     "--quiet",
@@ -57,5 +57,41 @@ impl Wkhtmltopdf {
         }
 
         Ok(proc.wait()?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::any::{Any, TypeId};
+
+    #[test]
+    fn check_wkhtmltopdf_installed() -> anyhow::Result<()> {
+        let mut proc = Command::new("which")
+            .args(&["wkhtmltopdf"])
+            .stdout(Stdio::piped())
+            .spawn()?;
+
+        let mut output = String::new();
+        proc.stdout.take().unwrap().read_to_string(&mut output)?;
+        let status = proc.wait()?;
+
+        assert!(status.success());
+        assert_ne!(output, "".to_string());
+        Ok(())
+    }
+
+    #[test]
+    fn check_wkhtmltopdf_singleton() {
+        assert_eq!(wkhtmltopdf().type_id(), TypeId::of::<Box<Wkhtmltopdf>>());
+    }
+
+    #[test]
+    fn test_wkhtmltopdf() {
+        let mut output = vec![];
+        let status = wkhtmltopdf().run(b"hello world", &mut output).unwrap();
+
+        assert!(status.success());
+        assert_ne!(output.len(), 0);
     }
 }

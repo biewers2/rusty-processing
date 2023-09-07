@@ -8,13 +8,15 @@ edition = "2021"
 [dependencies]
 lazy_static = "~1.4.0"
 json = "0.12.4"
-md5 = "^0.7.0"
+md5 = "0.7.0"
 mail-parser = "^0.8.2"
 html2text = "^0.6.0"
 html-escape = "0.2.13"
 threadpool = "1.8.1"
 serde = { version = "~1.0.186", features = ["derive"] }
 anyhow = "~1.0.75"
+tempfile = "~3.8.0"
+mockall = "~0.11.4"
 
 [dependencies.uuid]
 version = "~1.4.1"
@@ -23,3 +25,6 @@ features = [
     "fast-rng",          # Use a faster (but still sufficiently random) RNG
     "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
 ]
+
+[dev-dependencies]
+pretty_assertions = "~1.4.0"

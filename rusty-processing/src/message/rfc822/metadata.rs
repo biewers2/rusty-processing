@@ -1,6 +1,6 @@
-use std::path;
 use std::fs::File;
 use std::io::Write;
+use std::path;
 
 use json::object;
 use mail_parser::{Message, MimeHeaders};
@@ -8,7 +8,11 @@ use mail_parser::{Message, MimeHeaders};
 use crate::message::rfc822::processor::Rfc822Processor;
 
 impl Rfc822Processor {
-    pub fn extract_metadata(&self, message: &Message, output_path: &path::PathBuf) -> anyhow::Result<()> {
+    pub fn extract_metadata(
+        &self,
+        message: &Message,
+        output_path: &path::PathBuf,
+    ) -> anyhow::Result<()> {
         let mut metadata = object! {};
 
         for (key, value) in message.headers_raw() {
@@ -26,7 +30,8 @@ impl Rfc822Processor {
 
         let metadata_json = json::stringify_pretty(metadata, 2);
         let mut file = File::create(output_path)?;
-        file.write_all(metadata_json.as_bytes()).and(file.write_all(b"\n"))?;
+        file.write_all(metadata_json.as_bytes())
+            .and(file.write_all(b"\n"))?;
 
         Ok(())
     }

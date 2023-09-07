@@ -1,7 +1,7 @@
+use anyhow::anyhow;
+use std::borrow::Cow;
 use std::sync::{mpsc, Mutex};
 use std::{path, thread};
-use std::borrow::Cow;
-use anyhow::anyhow;
 
 use lazy_static::lazy_static;
 
@@ -9,7 +9,7 @@ use crate::application::mbox::processor::MboxProcessor;
 use crate::common::output_type::ProcessType;
 use crate::message::rfc822::processor::Rfc822Processor;
 use crate::processing::context::Context;
-use crate::processing::output::{Output};
+use crate::processing::output::Output;
 use crate::processing::process::Process;
 
 lazy_static! {
@@ -55,7 +55,7 @@ impl Processor {
         F: Fn(anyhow::Result<Output>) -> (),
         F: Send + 'static,
     {
-        let (tx, rs) = mpsc::channel();
+        let (tx, rx) = mpsc::channel();
         let context = Context {
             output_dir,
             mimetype,
@@ -64,7 +64,7 @@ impl Processor {
         };
 
         thread::spawn(move || loop {
-            match rs.recv() {
+            match rx.recv() {
                 Ok(res) => handle_result(res),
                 Err(_) => break,
             }
@@ -95,7 +95,7 @@ impl Processor {
     ) where
         F: Fn(anyhow::Result<Output>) -> (),
     {
-        let (tx, rs) = mpsc::channel();
+        let (tx, rx) = mpsc::channel();
         let context = Context {
             output_dir,
             mimetype,
@@ -108,7 +108,7 @@ impl Processor {
                 self.process_mime(context, |processor| processor.handle_raw(raw.clone()));
             });
 
-            while let Ok(res) = rs.recv() {
+            while let Ok(res) = rx.recv() {
                 handle_result(res);
             }
         });
