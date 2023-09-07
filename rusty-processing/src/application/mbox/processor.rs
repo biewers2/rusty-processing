@@ -108,11 +108,18 @@ mod tests {
         let (tx, rx) = std::sync::mpsc::channel();
         let processor = processor(tx)?;
 
-        let outputs = thread::scope(move |s| {
+        let mut outputs = thread::scope(move |s| {
             s.spawn(move || processor.handle_file(&path));
             rx.into_iter()
                 .map(|result| result.unwrap())
                 .collect::<Vec<Output>>()
+        });
+        // Sort to make the test deterministic.
+        outputs.sort_by(|a, b| {
+            match (a, b) {
+                (Output::Embedded(a), Output::Embedded(b)) => a.dupe_id.cmp(&b.dupe_id),
+                _ => panic!("expected embedded output"),
+            }
         });
 
         assert_eq!(outputs.len(), 2);

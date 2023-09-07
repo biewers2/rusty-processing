@@ -2415,9 +2415,20 @@ dependencies = [
  "mail-parser",
  "md5",
  "mockall",
+ "rusty-processing-identify",
  "serde",
  "tempfile",
  "threadpool",
+]
+
+[[package]]
+name = "rusty-processing-identify"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lazy_static",
+ "mail-parser",
+ "md5",
  "uuid",
 ]
 

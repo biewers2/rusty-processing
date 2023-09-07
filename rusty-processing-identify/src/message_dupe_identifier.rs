@@ -4,8 +4,8 @@ use lazy_static::lazy_static;
 use mail_parser::Message;
 use uuid::Uuid;
 
-use crate::dupe_id::identify_dupe::{IdentifyDupe, IdentifyDupeService};
-use crate::dupe_id::md5_dupe_identifier::md5_dupe_identifier;
+use crate::identify::{Identify, IdentifyDupeService};
+use crate::md5_dupe_identifier::md5_dupe_identifier;
 
 lazy_static! {
     static ref MESSAGE_DUPE_IDENTIFIER: IdentifyDupeService =
@@ -23,7 +23,7 @@ pub fn message_dupe_identifier() -> &'static IdentifyDupeService {
 #[derive(Default)]
 pub struct MessageDupeIdentifier {}
 
-impl IdentifyDupe for MessageDupeIdentifier {
+impl Identify for MessageDupeIdentifier {
     fn identify(&self, raw: &[u8]) -> String {
         let message = Message::parse(&raw);
         let raw_id = message
@@ -39,6 +39,8 @@ impl IdentifyDupe for MessageDupeIdentifier {
 #[cfg(test)]
 mod tests {
     use std::any::{Any, TypeId};
+
+    use crate::identify::IdentifyDupeService;
 
     use super::*;
 

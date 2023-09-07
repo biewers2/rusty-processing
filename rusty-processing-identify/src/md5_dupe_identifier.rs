@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use crate::dupe_id::identify_dupe::{IdentifyDupe, IdentifyDupeService};
+use crate::identify::{Identify, IdentifyDupeService};
 
 lazy_static! {
     static ref MD5_DUPE_IDENTIFIER: IdentifyDupeService = Box::<Md5DupeIdentifier>::default();
@@ -16,10 +16,10 @@ pub fn md5_dupe_identifier() -> &'static IdentifyDupeService {
 ///
 /// This identifier uses the MD5 hash of the raw bytes to identify duplicates.
 ///
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Md5DupeIdentifier {}
 
-impl IdentifyDupe for Md5DupeIdentifier {
+impl Identify for Md5DupeIdentifier {
     fn identify(&self, raw: &[u8]) -> String {
         format!("{:x}", md5::compute(raw))
     }

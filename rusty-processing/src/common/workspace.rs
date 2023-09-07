@@ -2,11 +2,11 @@ use std::fs::File;
 use std::io::Write;
 use std::path;
 use std::path::PathBuf;
+use rusty_processing_identify::identifier::identifier;
 
 use crate::common::mime_extension_map::map_to_file_ext;
 use crate::common::output_type::ProcessType;
 use crate::common::util;
-use crate::dupe_id::identify_dupe::identifier;
 use crate::processing::context::Context;
 
 /// A workspace defines a directory tree schematic.
