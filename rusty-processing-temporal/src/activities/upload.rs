@@ -1,5 +1,5 @@
-use std::{fs, path};
 use std::fs::File;
+use std::{fs, path};
 
 use aws_sdk_s3::primitives::ByteStream;
 use byte_unit::n_mb_bytes;
@@ -25,10 +25,14 @@ pub async fn upload(_ctx: ActContext, input: UploadInput) -> anyhow::Result<()> 
     if source_path.is_dir() {
         for path in recurse_dir(source_path.clone())? {
             let path_suffix = path.strip_prefix(&source_path)?;
-            let s3_uri = format!("{}/{}", input.output_s3_uri, path_suffix.to_str().unwrap_or(""));
+            let s3_uri = format!(
+                "{}/{}",
+                input.output_s3_uri,
+                path_suffix.to_str().unwrap_or("")
+            );
             upload_file(path, &input.mimetype, s3_uri).await?;
         }
-        return Ok(())
+        return Ok(());
     } else if source_path.size_on_disk()? > MB_10 {
         let uploader = MultipartUploader::new(input.output_s3_uri)?;
         let mut file = File::open(source_path)?;
@@ -60,11 +64,16 @@ fn recurse_dir(dir: path::PathBuf) -> anyhow::Result<Vec<path::PathBuf>> {
     Ok(paths)
 }
 
-async fn upload_file(source_file_path: path::PathBuf, mimetype: &Option<String>, output_s3_uri: String) -> anyhow::Result<()> {
+async fn upload_file(
+    source_file_path: path::PathBuf,
+    mimetype: &Option<String>,
+    output_s3_uri: String,
+) -> anyhow::Result<()> {
     let (bucket, key) = parse_s3_uri(output_s3_uri.as_str())?;
     let buf = fs::read(source_file_path)?;
 
-    let mut builder = s3_client().await
+    let mut builder = s3_client()
+        .await
         .put_object()
         .bucket(bucket)
         .key(key)

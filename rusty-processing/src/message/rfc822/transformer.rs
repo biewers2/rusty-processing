@@ -74,9 +74,7 @@ impl MessageTransformer {
 
             HeaderValue::Text(text) => self.visitor.on_header_text(name, text),
 
-            HeaderValue::TextList(text_list) => {
-                self.visitor.on_header_text_list(name, text_list)
-            }
+            HeaderValue::TextList(text_list) => self.visitor.on_header_text_list(name, text_list),
 
             HeaderValue::DateTime(date_time) => {
                 println!("{}", date_time.to_string());
@@ -85,7 +83,7 @@ impl MessageTransformer {
 
             HeaderValue::ContentType(content_type) => {
                 self.visitor.on_header_content_type(&content_type)
-            },
+            }
 
             HeaderValue::Empty => None,
         }
@@ -154,9 +152,9 @@ impl MessageTransformer {
 mod test {
     use std::borrow::Cow;
 
+    use crate::test_util;
     use anyhow::anyhow;
     use mail_parser::{Addr, ContentType, DateTime, Group};
-    use crate::test_util;
 
     use super::*;
 
@@ -166,18 +164,34 @@ mod test {
         fn on_header_address<'a>(&'a self, name: &str, address: &Addr<'a>) -> Option<String> {
             match name {
                 "From" => {
-                    assert_eq!(&Addr { name: None, address: Some(Cow::from("rusty.processing@mime.com")) }, address);
+                    assert_eq!(
+                        &Addr {
+                            name: None,
+                            address: Some(Cow::from("rusty.processing@mime.com"))
+                        },
+                        address
+                    );
                     Some("From header".to_string())
-                },
+                }
                 "To" => {
-                    assert_eq!(&Addr { name: None, address: Some(Cow::from("processing.rusty@emim.com")) }, address);
+                    assert_eq!(
+                        &Addr {
+                            name: None,
+                            address: Some(Cow::from("processing.rusty@emim.com"))
+                        },
+                        address
+                    );
                     Some("To header".to_string())
-                },
+                }
                 _ => panic!("Unexpected header: {}", name),
             }
         }
 
-        fn on_header_address_list<'a>(&self, name: &str, address_list: &Vec<Addr<'a>>) -> Option<String> {
+        fn on_header_address_list<'a>(
+            &self,
+            name: &str,
+            address_list: &Vec<Addr<'a>>,
+        ) -> Option<String> {
             panic!("Unexpected header: ({}, {:?})", name, address_list)
         }
 
@@ -185,7 +199,11 @@ mod test {
             panic!("Unexpected header: ({}, {:?})", name, group)
         }
 
-        fn on_header_group_list<'a>(&self, name: &str, group_list: &Vec<Group<'a>>) -> Option<String> {
+        fn on_header_group_list<'a>(
+            &self,
+            name: &str,
+            group_list: &Vec<Group<'a>>,
+        ) -> Option<String> {
             panic!("Unexpected header: ({}, {:?})", name, group_list)
         }
 
@@ -194,24 +212,28 @@ mod test {
                 "Message-ID" => {
                     assert_eq!("12345-headers-small@rusty-processing", text);
                     Some("Message-ID header".to_string())
-                },
+                }
                 "Subject" => {
                     assert_eq!("Now THATS A LOT OF RUST", text);
                     Some("Subject header".to_string())
-                },
+                }
                 "MIME-Version" => {
                     assert_eq!("1.0", text);
                     Some("Mime-Version header".to_string())
-                },
+                }
                 "Content-Transfer-Encoding" => {
                     assert_eq!("7bit", text);
                     Some("Content-Transfer-Encoding header".to_string())
-                },
+                }
                 _ => panic!("Unexpected header: {}", name),
             }
         }
 
-        fn on_header_text_list<'a>(&self, name: &str, text_list: &Vec<Cow<'a, str>>) -> Option<String> {
+        fn on_header_text_list<'a>(
+            &self,
+            name: &str,
+            text_list: &Vec<Cow<'a, str>>,
+        ) -> Option<String> {
             panic!("Unexpected header: ({}, {:?})", name, text_list)
         }
 

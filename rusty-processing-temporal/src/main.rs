@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use temporal_sdk::{sdk_client_options, Worker};
-use temporal_sdk_core::{CoreRuntime, init_worker};
+use temporal_sdk_core::{init_worker, CoreRuntime};
 use temporal_sdk_core_api::telemetry::TelemetryOptionsBuilder;
 use temporal_sdk_core_api::worker::WorkerConfigBuilder;
 use url::Url;

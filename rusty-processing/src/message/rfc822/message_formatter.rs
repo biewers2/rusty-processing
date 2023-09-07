@@ -30,14 +30,15 @@ impl MessageFormatter {
     ///
     pub fn format_address_list(&self, address_list: &Vec<Addr>) -> Option<String> {
         (!address_list.is_empty())
-            .then(|| address_list
-                .iter()
-                .map(|addr| self.format_address(&addr))
-                .filter(|addr| addr.is_some())
-                .map(|addr| addr.unwrap())
-                .collect::<Vec<String>>()
-                .join(", ")
-            )
+            .then(|| {
+                address_list
+                    .iter()
+                    .map(|addr| self.format_address(&addr))
+                    .filter(|addr| addr.is_some())
+                    .map(|addr| addr.unwrap())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            })
             .and_then(|value| (!value.is_empty()).then(|| value))
     }
 
@@ -69,14 +70,15 @@ impl MessageFormatter {
     /// ```
     pub fn format_group_list(&self, group_list: &Vec<Group>) -> Option<String> {
         (!group_list.is_empty())
-            .then(|| group_list
-                .iter()
-                .map(|group| self.format_group(&group))
-                .filter(|group| group.is_some())
-                .map(|group| group.unwrap())
-                .collect::<Vec<String>>()
-                .join(", ")
-            )
+            .then(|| {
+                group_list
+                    .iter()
+                    .map(|group| self.format_group(&group))
+                    .filter(|group| group.is_some())
+                    .map(|group| group.unwrap())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            })
             .and_then(|value| (!value.is_empty()).then(|| value))
     }
 
@@ -86,7 +88,9 @@ impl MessageFormatter {
     /// If the list is empty, `None` is returned.
     ///
     pub fn format_text_list(&self, text_list: &Vec<Cow<str>>) -> Option<String> {
-        let list = text_list.to_owned().into_iter()
+        let list = text_list
+            .to_owned()
+            .into_iter()
             .filter(|text| !text.is_empty())
             .collect::<Vec<Cow<str>>>();
         (!list.is_empty()).then(|| list.join(", "))
@@ -110,9 +114,9 @@ impl MessageFormatter {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-    use anyhow::anyhow;
     use super::*;
+    use anyhow::anyhow;
+    use std::collections::HashMap;
 
     fn addr<'a>(name: &'a str, address: &'a str) -> Addr<'a> {
         Addr {
@@ -132,7 +136,10 @@ mod test {
     fn test_format_address() -> anyhow::Result<()> {
         let formatter = MessageFormatter::default();
         let cases = vec![
-            (addr("name", "name@domain.com"), Some("name <name@domain.com>".to_string())),
+            (
+                addr("name", "name@domain.com"),
+                Some("name <name@domain.com>".to_string()),
+            ),
             (addr("name-only", ""), Some("name-only".to_string())),
             (addr("", "address-only"), Some("<address-only>".to_string())),
             (addr("", ""), None),
@@ -156,7 +163,10 @@ mod test {
                     addr("name2", "name2@domain.com"),
                     addr("abcde", "abcde@email.com"),
                 ],
-                Some("name <name@domain.com>, name2 <name2@domain.com>, abcde <abcde@email.com>".to_string()),
+                Some(
+                    "name <name@domain.com>, name2 <name2@domain.com>, abcde <abcde@email.com>"
+                        .to_string(),
+                ),
             ),
             (
                 vec![
@@ -164,15 +174,9 @@ mod test {
                     addr("", ""),
                     addr("abcde", "abcde@email.com"),
                 ],
-                Some("name, abcde <abcde@email.com>".to_string())
+                Some("name, abcde <abcde@email.com>".to_string()),
             ),
-            (
-                vec![
-                    addr("", ""),
-                    addr("", ""),
-                ],
-                None
-            ),
+            (vec![addr("", ""), addr("", "")], None),
         ];
 
         for (addrs, expected) in cases {
@@ -188,26 +192,24 @@ mod test {
         let formatter = MessageFormatter::default();
         let cases = vec![
             (
-                group("group-name", vec![
-                    addr("name", "name@domain.com"),
-                    addr("name2", "name2@email.com"),
-                ]),
-                Some("group-name <name <name@domain.com>, name2 <name2@email.com>>".to_string())
+                group(
+                    "group-name",
+                    vec![
+                        addr("name", "name@domain.com"),
+                        addr("name2", "name2@email.com"),
+                    ],
+                ),
+                Some("group-name <name <name@domain.com>, name2 <name2@email.com>>".to_string()),
             ),
             (
-                group("", vec![
-                    addr("", "name@domain.com"),
-                ]),
-                Some("<<name@domain.com>>".to_string())
+                group("", vec![addr("", "name@domain.com")]),
+                Some("<<name@domain.com>>".to_string()),
             ),
             (
                 group("group-name-only", vec![]),
-                Some("group-name-only".to_string())
+                Some("group-name-only".to_string()),
             ),
-            (
-                group("", vec![]),
-                None
-            ),
+            (group("", vec![]), None),
         ];
 
         for (group, expected) in cases {
@@ -256,20 +258,10 @@ mod test {
         let formatter = MessageFormatter::default();
         let cases = vec![
             (
-                vec![
-                    Cow::from("text1"),
-                    Cow::from("text2"),
-                    Cow::from("text3"),
-                ],
-                Some("text1, text2, text3".to_string())
+                vec![Cow::from("text1"), Cow::from("text2"), Cow::from("text3")],
+                Some("text1, text2, text3".to_string()),
             ),
-            (
-                vec![
-                    Cow::from(""),
-                    Cow::from(""),
-                ],
-                None
-            ),
+            (vec![Cow::from(""), Cow::from("")], None),
         ];
 
         for (texts, expected) in cases {

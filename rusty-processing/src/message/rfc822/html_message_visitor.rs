@@ -59,7 +59,9 @@ impl MessageVisitor for HtmlMessageVisitor {
     }
 
     fn on_header_text(&self, name: &str, text: &Cow<str>) -> Option<String> {
-        HEADERS.contains(&name).then_some(format!("<b>{}</b>: {}", name, encode_text(text)))
+        HEADERS
+            .contains(&name)
+            .then_some(format!("<b>{}</b>: {}", name, encode_text(text)))
     }
 
     fn on_header_text_list(&self, name: &str, text_list: &Vec<Cow<str>>) -> Option<String> {

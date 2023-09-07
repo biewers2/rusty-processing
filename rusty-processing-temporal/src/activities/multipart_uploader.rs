@@ -1,9 +1,9 @@
-use std::fs::File;
-use std::io::Read;
-use aws_sdk_s3::primitives::ByteStream;
-use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use crate::util::parse_s3_uri::parse_s3_uri;
 use crate::util::services::s3_client;
+use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
+use std::fs::File;
+use std::io::Read;
 
 pub struct MultipartUploader {
     bucket: String,
@@ -17,7 +17,8 @@ impl MultipartUploader {
     }
 
     pub async fn upload(&self, file: &mut File) -> anyhow::Result<()> {
-        let multipart_upload = s3_client().await
+        let multipart_upload = s3_client()
+            .await
             .create_multipart_upload()
             .bucket(&self.bucket)
             .key(&self.key)
@@ -32,17 +33,22 @@ impl MultipartUploader {
         Ok(())
     }
 
-    async fn upload_parts(&self, upload_id: &String, file: &mut File) -> anyhow::Result<Vec<CompletedPart>> {
+    async fn upload_parts(
+        &self,
+        upload_id: &String,
+        file: &mut File,
+    ) -> anyhow::Result<Vec<CompletedPart>> {
         let mut parts = vec![];
         let mut buf = [0_u8; 1024];
         let mut part_num = 1_i32;
 
         while let Ok(bytes_read) = file.read(&mut buf) {
             if bytes_read == 0 {
-                break
+                break;
             }
 
-            let upload_part = s3_client().await
+            let upload_part = s3_client()
+                .await
                 .upload_part()
                 .bucket(&self.bucket)
                 .key(&self.key)
@@ -65,12 +71,17 @@ impl MultipartUploader {
         Ok(parts)
     }
 
-    async fn complete_upload(&self, upload_id: &String, parts: Vec<CompletedPart>) -> anyhow::Result<()> {
+    async fn complete_upload(
+        &self,
+        upload_id: &String,
+        parts: Vec<CompletedPart>,
+    ) -> anyhow::Result<()> {
         let completed_multipart_upload = CompletedMultipartUpload::builder()
             .set_parts(Some(parts))
             .build();
 
-        s3_client().await
+        s3_client()
+            .await
             .complete_multipart_upload()
             .bucket(&self.bucket)
             .key(&self.key)

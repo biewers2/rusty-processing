@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use mail_parser::{Addr, ContentType, DateTime, Group};
-use mockall::automock;
 
 pub trait MessageVisitor {
     fn on_header_prefix(&self) -> Option<String> {

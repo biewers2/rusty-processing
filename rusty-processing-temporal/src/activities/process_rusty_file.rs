@@ -1,8 +1,8 @@
 use std::{path, thread};
 
+use rusty_processing::common::output_type::ProcessType;
 use serde::{Deserialize, Serialize};
 use temporal_sdk::ActContext;
-use rusty_processing::common::output_type::ProcessType;
 
 use rusty_processing::processing::output::{Output, OutputInfo};
 use rusty_processing::processing::processor::processor;
@@ -63,6 +63,6 @@ pub async fn process_rusty_file(
     Ok(ProcessRustyFileOutput {
         processed,
         embedded,
-        failures
+        failures,
     })
 }

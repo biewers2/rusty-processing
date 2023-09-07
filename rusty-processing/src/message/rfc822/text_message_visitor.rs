@@ -42,7 +42,9 @@ impl MessageVisitor for TextMessageVisitor {
     }
 
     fn on_header_text(&self, name: &str, text: &Cow<str>) -> Option<String> {
-        HEADERS.contains(&name).then_some(format!("{}: {}", name, text))
+        HEADERS
+            .contains(&name)
+            .then_some(format!("{}: {}", name, text))
     }
 
     fn on_header_text_list(&self, name: &str, text_list: &Vec<Cow<str>>) -> Option<String> {
@@ -66,11 +68,11 @@ impl MessageVisitor for TextMessageVisitor {
 
 #[cfg(test)]
 mod test {
-    use anyhow::anyhow;
-    use mail_parser::Message;
+    use super::*;
     use crate::message::rfc822::transformer::MessageTransformer;
     use crate::test_util;
-    use super::*;
+    use anyhow::anyhow;
+    use mail_parser::Message;
 
     #[test]
     fn test_text_message_visitor() -> anyhow::Result<()> {

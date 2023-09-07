@@ -77,11 +77,10 @@ fn main() {
         args.output,
         args.mimetype,
         types,
-        move |result| {
-            match result {
-                Ok(Output::Embedded(output)) => println!("Embedded: {:?}", output),
-                Ok(Output::Processed(output)) => println!("Processed: {:?}", output),
-                Err(err) => println!("Error: {}", err),
-            }
-        });
+        move |result| match result {
+            Ok(Output::Embedded(output)) => println!("Embedded: {:?}", output),
+            Ok(Output::Processed(output)) => println!("Processed: {:?}", output),
+            Err(err) => println!("Error: {}", err),
+        },
+    );
 }

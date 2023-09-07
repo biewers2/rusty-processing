@@ -1,6 +1,6 @@
 use async_once::AsyncOnce;
-use lazy_static::lazy_static;
 use aws_sdk_s3 as s3;
+use lazy_static::lazy_static;
 
 lazy_static! {
     static ref S3_CLIENT: AsyncOnce<s3::Client> = AsyncOnce::new(async {

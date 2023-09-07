@@ -1,6 +1,6 @@
-use std::{fs, path};
 use std::fs::File;
 use std::io::Write;
+use std::{fs, path};
 
 use serde::{Deserialize, Serialize};
 use temporal_sdk::ActContext;
@@ -22,7 +22,8 @@ pub struct DownloadOutput {
 
 pub async fn download(_ctx: ActContext, input: DownloadInput) -> anyhow::Result<DownloadOutput> {
     let (bucket, key) = parse_s3_uri(input.source_s3_uri.as_str())?;
-    let object = s3_client().await
+    let object = s3_client()
+        .await
         .get_object()
         .bucket(bucket)
         .key(key)
