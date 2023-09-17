@@ -38,8 +38,7 @@ impl Rfc822Processor {
     fn format_attachment_names(&self, message: &Message) -> Option<String> {
         let formatted_atts = message
             .attachments()
-            .map(|att| att.attachment_name())
-            .flatten()
+            .filter_map(|att| att.attachment_name())
             .collect::<Vec<&str>>()
             .join(", ");
         (!formatted_atts.is_empty()).then_some(formatted_atts)

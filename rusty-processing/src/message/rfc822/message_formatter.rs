@@ -33,8 +33,7 @@ impl MessageFormatter {
             .then(|| {
                 addresses
                     .iter()
-                    .map(|addr| self.format_address(addr))
-                    .flatten()
+                    .filter_map(|addr| self.format_address(addr))
                     .collect::<Vec<String>>()
                     .join(", ")
             })
@@ -72,8 +71,7 @@ impl MessageFormatter {
             .then(|| {
                 groups
                     .iter()
-                    .map(|group| self.format_group(group))
-                    .flatten()
+                    .filter_map(|group| self.format_group(group))
                     .collect::<Vec<String>>()
                     .join(", ")
             })
