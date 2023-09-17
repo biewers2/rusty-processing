@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::util::mimetype;
 use crate::common::workspace::Workspace;
-use crate::process::{Process, ProcessContext, ProcessOutput, ProcessOutputType};
+use crate::processing::{Process, ProcessContext, ProcessOutput, ProcessOutputType};
 
 #[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub struct Rfc822Processor;
@@ -116,7 +116,7 @@ impl Rfc822Processor {
                 part.contents(),
                 &context.output_dir,
                 &mimetype,
-                &vec![]
+                &[]
             )?;
 
             context.add_result(Ok(ProcessOutput {

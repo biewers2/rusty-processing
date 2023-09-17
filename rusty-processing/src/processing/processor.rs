@@ -6,9 +6,9 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
 use crate::application::mbox::processor::MboxProcessor;
-use crate::process::{ProcessContext, ProcessType};
-use crate::process::process::Process;
-use crate::process::process_output::ProcessOutput;
+use crate::processing::{ProcessContext, ProcessType};
+use crate::processing::process::Process;
+use crate::processing::process_output::ProcessOutput;
 
 lazy_static! {
     static ref PROCESSOR: Processor = Processor;

@@ -28,7 +28,7 @@ impl MessageFormatter {
     ///
     /// The address are formatted using `format_address` and then concatenated into a single string separated by ", ".
     ///
-    pub fn format_addresses(&self, addresses: &Vec<Addr>) -> Option<String> {
+    pub fn format_addresses(&self, addresses: &[Addr]) -> Option<String> {
         (!addresses.is_empty())
             .then(|| {
                 addresses
@@ -66,7 +66,7 @@ impl MessageFormatter {
     /// ```text
     /// "GroupName1 <Name1 <address1@domain1>, ...>, GroupName2 <Name1 <address1@domain1>, ...>, ...>"
     /// ```
-    pub fn format_groups(&self, groups: &Vec<Group>) -> Option<String> {
+    pub fn format_groups(&self, groups: &[Group]) -> Option<String> {
         (!groups.is_empty())
             .then(|| {
                 groups
@@ -83,12 +83,11 @@ impl MessageFormatter {
     /// The strings are concatenated into a single string separated by ", ".
     /// If the list is empty, `None` is returned.
     ///
-    pub fn format_text_list(&self, text_list: &Vec<Cow<str>>) -> Option<String> {
-        let list = text_list
-            .to_owned()
-            .into_iter()
+    pub fn format_text_list(&self, text_list: &[Cow<str>]) -> Option<String> {
+        let list: Vec<Cow<str>> = text_list.iter()
+            .cloned()
             .filter(|text| !text.is_empty())
-            .collect::<Vec<Cow<str>>>();
+            .collect();
         (!list.is_empty()).then(|| list.join(", "))
     }
 

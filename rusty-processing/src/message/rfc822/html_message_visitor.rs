@@ -43,28 +43,28 @@ impl MessageVisitor for HtmlMessageVisitor {
     //         ))
     // }
 
-    fn on_header_addresses(&self, name: &str, address_list: &Vec<Addr>) -> Option<String> {
+    fn on_header_addresses(&self, name: &str, address_list: &[Addr]) -> Option<String> {
         self.formatter
             .format_addresses(address_list)
             .map(|addrs| format!("<b>{}</b>: {}", name, encode_text(addrs.as_str())))
     }
 
-    fn on_header_groups(&self, name: &str, group_list: &Vec<Group>) -> Option<String> {
+    fn on_header_groups(&self, name: &str, group_list: &[Group]) -> Option<String> {
         self.formatter
             .format_groups(group_list)
             .map(|groups| format!("<b>{}</b>: {}", name, encode_text(groups.as_str())))
     }
 
-    fn on_header_text(&self, name: &str, text: &Cow<str>) -> Option<String> {
+    fn on_header_text(&self, name: &str, text: Cow<str>) -> Option<String> {
         HEADERS
             .contains(&name)
-            .then_some(format!("<b>{}</b>: {}", name, encode_text(text)))
+            .then_some(format!("<b>{}</b>: {}", name, encode_text(&text)))
     }
 
-    fn on_header_text_list(&self, name: &str, text_list: &Vec<Cow<str>>) -> Option<String> {
+    fn on_header_text_list(&self, name: &str, text_list: &[Cow<str>]) -> Option<String> {
         self.formatter
             .format_text_list(text_list)
-            .map(|texts| format!("<b>{}</b>: {}", name, encode_text(texts.as_str())))
+            .map(|texts| format!("<b>{}</b>: {}", name, encode_text(&texts)))
     }
 
     fn on_header_date_time(&self, name: &str, date_time: &DateTime) -> Option<String> {
@@ -79,7 +79,7 @@ impl MessageVisitor for HtmlMessageVisitor {
         None
     }
 
-    fn on_part_text(&self, value: &Cow<str>) -> String {
+    fn on_part_text(&self, value: Cow<str>) -> String {
         value
             .split('\n')
             .map(|line| format!("<p>{}</p>", encode_text(line)))

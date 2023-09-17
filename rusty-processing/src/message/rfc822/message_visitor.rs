@@ -32,7 +32,7 @@ pub trait MessageVisitor {
     fn on_header_addresses(
         &self,
         _name: &str,
-        _address_list: &Vec<Addr<'_>>,
+        _address_list: &[Addr<'_>],
     ) -> Option<String> {
         None
     }
@@ -40,19 +40,19 @@ pub trait MessageVisitor {
     fn on_header_groups(
         &self,
         _name: &str,
-        _group_list: &Vec<Group<'_>>,
+        _group_list: &[Group<'_>],
     ) -> Option<String> {
         None
     }
 
-    fn on_header_text(&self, _name: &str, _text: &Cow<'_, str>) -> Option<String> {
+    fn on_header_text(&self, _name: &str, _text: Cow<str>) -> Option<String> {
         None
     }
 
     fn on_header_text_list(
         &self,
         _name: &str,
-        _text_list: &Vec<Cow<'_, str>>,
+        _text_list: &[Cow<str>],
     ) -> Option<String> {
         None
     }
@@ -67,19 +67,19 @@ pub trait MessageVisitor {
 
     // Body part visitors
 
-    fn on_part_text(&self, value: &Cow<'_, str>) -> String {
+    fn on_part_text(&self, value: Cow<str>) -> String {
         value.to_string()
     }
 
-    fn on_part_html(&self, value: &Cow<'_, str>) -> String {
+    fn on_part_html(&self, value: Cow<str>) -> String {
         value.to_string()
     }
 
-    fn on_part_binary(&self, value: &Cow<'_, [u8]>) -> Vec<u8> {
+    fn on_part_binary(&self, value: Cow<[u8]>) -> Vec<u8> {
         value.to_vec()
     }
 
-    fn on_part_inline_binary(&self, value: &Cow<'_, [u8]>) -> Vec<u8> {
+    fn on_part_inline_binary(&self, value: Cow<[u8]>) -> Vec<u8> {
         value.to_vec()
     }
 }

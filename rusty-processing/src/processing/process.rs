@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use crate::process::ProcessContext;
+use crate::processing::ProcessContext;
 
 /// Process is a trait that defines the interface for process data from a file or as raw bytes.
 ///

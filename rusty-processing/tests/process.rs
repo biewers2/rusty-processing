@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use rusty_processing::process::{processor, ProcessOutput, ProcessOutputType, ProcessType};
+use rusty_processing::processing::{processor, ProcessOutput, ProcessOutputType, ProcessType};
 
 #[test]
 fn test_mbox_file() -> anyhow::Result<()> {
@@ -34,8 +34,8 @@ fn test_mbox_file() -> anyhow::Result<()> {
                     results_ref.insert(output);
                 },
                 Err(e) => {
-                    eprintln!("Error process file: {}", e);
-                    panic!("Error process file");
+                    eprintln!("Error processing file: {}", e);
+                    panic!("Error processing file");
                 },
             }
         },

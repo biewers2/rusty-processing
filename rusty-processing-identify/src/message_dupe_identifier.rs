@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use lazy_static::lazy_static;
-use mail_parser::Message;
+use mail_parser::MessageParser;
 use uuid::Uuid;
 
 use crate::identify::{Identify, IdentifyDupeService};
@@ -25,7 +25,7 @@ pub struct MessageDupeIdentifier;
 
 impl Identify for MessageDupeIdentifier {
     fn identify(&self, raw: &[u8]) -> String {
-        let message = Message::parse(&raw);
+        let message = MessageParser::default().parse(raw);
         let raw_id = message
             .as_ref()
             .and_then(|msg| msg.message_id())

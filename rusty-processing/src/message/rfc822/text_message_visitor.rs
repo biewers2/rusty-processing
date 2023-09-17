@@ -21,25 +21,25 @@ impl MessageVisitor for TextMessageVisitor {
     //     todo!()
     // }
 
-    fn on_header_addresses(&self, name: &str, address_list: &Vec<Addr>) -> Option<String> {
+    fn on_header_addresses(&self, name: &str, address_list: &[Addr]) -> Option<String> {
         self.formatter
             .format_addresses(address_list)
             .map(|addrs| format!("{}: {}", name, addrs))
     }
 
-    fn on_header_groups(&self, name: &str, group_list: &Vec<Group>) -> Option<String> {
+    fn on_header_groups(&self, name: &str, group_list: &[Group]) -> Option<String> {
         self.formatter
             .format_groups(group_list)
             .map(|groups| format!("{}: {}", name, groups))
     }
 
-    fn on_header_text(&self, name: &str, text: &Cow<str>) -> Option<String> {
+    fn on_header_text(&self, name: &str, text: Cow<str>) -> Option<String> {
         HEADERS
             .contains(&name)
             .then_some(format!("{}: {}", name, text))
     }
 
-    fn on_header_text_list(&self, name: &str, text_list: &Vec<Cow<str>>) -> Option<String> {
+    fn on_header_text_list(&self, name: &str, text_list: &[Cow<str>]) -> Option<String> {
         self.formatter
             .format_text_list(text_list)
             .map(|texts| format!("{}: {}", name, texts))
@@ -53,7 +53,7 @@ impl MessageVisitor for TextMessageVisitor {
         None
     }
 
-    fn on_part_html(&self, value: &Cow<str>) -> String {
+    fn on_part_html(&self, value: Cow<str>) -> String {
         html2text::from_read(value.as_bytes(), 120)
     }
 }

@@ -2,7 +2,7 @@ use std::path;
 
 use clap::Parser;
 
-use rusty_processing::process::{processor, ProcessType};
+use rusty_processing::processing::{processor, ProcessType};
 
 #[derive(Parser, Debug)]
 struct Args {

@@ -25,8 +25,9 @@ impl Rfc822Processor {
 
         metadata["Has-Attachments"] = (message.attachment_count() > 0).into();
         metadata["Attachment-Count"] = message.attachment_count().into();
-        self.format_attachment_names(message)
-            .map(|atts| metadata["Attachment-Names"] = atts.into());
+        if let Some(atts) = self.format_attachment_names(message) {
+            metadata["Attachment-Names"] = atts.into();
+        }
 
         let metadata_json = json::stringify_pretty(metadata, 2);
         writer.write_all(metadata_json.as_bytes())

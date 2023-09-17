@@ -3,7 +3,7 @@ use std::path;
 use rusty_processing_identify::identifier::identifier;
 
 use crate::common::util;
-use crate::process::ProcessType;
+use crate::processing::ProcessType;
 
 /// A workspace defines a directory tree schematic.
 ///
@@ -42,7 +42,7 @@ impl Workspace {
         content: &[u8],
         output_dir: impl Into<path::PathBuf>,
         mimetype: impl AsRef<str>,
-        types: &Vec<ProcessType>
+        types: &[ProcessType]
     ) -> anyhow::Result<Workspace> {
         let dupe_id = identifier(&mimetype).identify(content);
         let entry_dir = output_dir.into().join(&dupe_id);
@@ -86,8 +86,8 @@ mod test {
         let workspace = Workspace::new(
             b"hello, world!",
             &output_dir,
-            &mimetype,
-            &vec![],
+            mimetype,
+            &[],
         )?;
 
         assert_eq!(workspace.dupe_id, dupe_id);

@@ -3,7 +3,7 @@ use std::{path, thread};
 use serde::{Deserialize, Serialize};
 use temporal_sdk::ActContext;
 
-use rusty_processing::process::{processor, ProcessOutput, ProcessType};
+use rusty_processing::processing::{processor, ProcessOutput, ProcessType};
 
 #[derive(Deserialize, Debug)]
 pub struct ProcessRustyFileInput {

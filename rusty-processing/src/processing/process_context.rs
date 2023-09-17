@@ -3,10 +3,10 @@ use std::path;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
-use crate::process::process_output::ProcessOutput;
-use crate::process::ProcessType;
+use crate::processing::process_output::ProcessOutput;
+use crate::processing::ProcessType;
 
-/// Structure defining the context for a process operation.
+/// Structure defining the context for a processing operation.
 ///
 #[derive(Debug, Clone)]
 pub struct ProcessContext {

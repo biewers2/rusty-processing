@@ -24,17 +24,17 @@ pub struct ProcessOutput {
     pub dupe_id: String,
 }
 
-/// Output is the result of process a file.
+/// Output is the result of processing a file.
 ///
 /// It can be either a new file or an embedded file.
 ///
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub enum ProcessOutputType {
-    /// A newly created file as a result of process the original file.
+    /// A newly created file as a result of processing the original file.
     ///
     Processed,
 
-    /// A file discovered during the process of the original file.
+    /// A file discovered during the processing of the original file.
     ///
     Embedded,
 }

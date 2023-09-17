@@ -9,7 +9,7 @@ edition = "2021"
 anyhow = "~1.0.75"
 lazy_static = "~1.4.0"
 md5 = "0.7.0"
-mail-parser = "^0.8.2"
+mail-parser = "0.9.0"
 
 [dependencies.uuid]
 version = "~1.4.1"

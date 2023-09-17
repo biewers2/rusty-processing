@@ -2,9 +2,9 @@
 ///
 pub(crate) mod wkhtmltopdf;
 
-/// Service for creating a "workspace" for process files.
+/// Service for creating a "workspace" for processing files.
 ///
-/// A workspace is a location inside a specified directory that is used to store the file output from process.
+/// A workspace is a location inside a specified directory that is used to store the file output from processing.
 ///
 pub(crate) mod workspace;
 

@@ -1,7 +1,7 @@
 //!
-//! Library for process files
+//! Library for processing files
 //!
-//! This library provides a framework for process files. It also provides a default processor that can be used
+//! This library provides a framework for processing files. It also provides a default processor that can be used
 //! in applications.
 //!
 #![warn(missing_docs)]
@@ -12,11 +12,11 @@
 ///
 pub mod common;
 
-/// Contains the core logic and interface for process files.
+/// Contains the core logic and interface for processing files.
 ///
 /// Provides the all-purpose processor that can be used to process all implemented file types.
 ///
-pub mod process;
+pub mod processing;
 
 pub(crate) mod message {
     pub mod rfc822;

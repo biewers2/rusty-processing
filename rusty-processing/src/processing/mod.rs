@@ -11,7 +11,7 @@ pub use self::process_output::*;
 pub(crate) use self::process_context::*;
 pub(crate) use self::process::*;
 
-/// The type of output to produce from process.
+/// The type of output to produce from processing.
 ///
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub enum ProcessType {

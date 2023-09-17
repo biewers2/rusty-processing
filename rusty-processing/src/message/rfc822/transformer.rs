@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::io::Write;
 
 use mail_parser::{Address, HeaderValue, Message, MessagePart, PartType};
@@ -69,7 +70,7 @@ impl MessageTransformer {
                 Address::Group(groups) => self.visitor.on_header_groups(name, groups),
             }
 
-            HeaderValue::Text(text) => self.visitor.on_header_text(name, text),
+            HeaderValue::Text(text) => self.visitor.on_header_text(name, Cow::to_owned(text)),
 
             HeaderValue::TextList(text_list) => self.visitor.on_header_text_list(name, text_list),
 
@@ -99,22 +100,22 @@ impl MessageTransformer {
     {
         match &part.body {
             PartType::Text(text) => {
-                let text = self.visitor.on_part_text(text);
+                let text = self.visitor.on_part_text(Cow::to_owned(text));
                 writer.write_all(text.as_bytes())?;
             }
 
             PartType::Html(html) => {
-                let html = self.visitor.on_part_html(html);
+                let html = self.visitor.on_part_html(Cow::to_owned(html));
                 writer.write_all(html.as_bytes())?;
             }
 
             PartType::Binary(binary) => {
-                let binary = self.visitor.on_part_binary(binary);
+                let binary = self.visitor.on_part_binary(Cow::to_owned(binary));
                 writer.write_all(binary.as_ref())?;
             }
 
             PartType::InlineBinary(inline_binary) => {
-                let inline_binary = self.visitor.on_part_inline_binary(inline_binary);
+                let inline_binary = self.visitor.on_part_inline_binary(Cow::to_owned(inline_binary));
                 writer.write_all(inline_binary.as_ref())?;
             }
 
@@ -174,7 +175,7 @@ mod test {
         fn on_header_addresses<'a>(
             &self,
             name: &str,
-            addresses: &Vec<Addr<'a>>,
+            addresses: &[Addr<'a>],
         ) -> Option<String> {
             match name {
                 "From" => {
@@ -198,12 +199,12 @@ mod test {
         fn on_header_groups<'a>(
             &self,
             name: &str,
-            group_list: &Vec<Group<'a>>,
+            group_list: &[Group<'a>],
         ) -> Option<String> {
             panic!("Unexpected header: ({}, {:?})", name, group_list)
         }
 
-        fn on_header_text<'a>(&self, name: &str, text: &Cow<'a, str>) -> Option<String> {
+        fn on_header_text<'a>(&self, name: &str, text: Cow<'a, str>) -> Option<String> {
             match name {
                 "Message-ID" => {
                     assert_eq!("12345-headers-small@rusty-processing", text);
@@ -228,7 +229,7 @@ mod test {
         fn on_header_text_list<'a>(
             &self,
             name: &str,
-            text_list: &Vec<Cow<'a, str>>,
+            text_list: &[Cow<'a, str>],
         ) -> Option<String> {
             panic!("Unexpected header: ({}, {:?})", name, text_list)
         }
@@ -250,20 +251,20 @@ mod test {
             Some("Content-Type header".to_string())
         }
 
-        fn on_part_text<'a>(&self, value: &Cow<'a, str>) -> String {
+        fn on_part_text(&self, value: Cow<str>) -> String {
             assert_eq!("This is a rusty email\n\n;)\n", value);
             "Text part".to_string()
         }
 
-        fn on_part_html<'a>(&self, value: &Cow<'a, str>) -> String {
+        fn on_part_html(&self, value: Cow<str>) -> String {
             panic!("Unexpected part: {}", value)
         }
 
-        fn on_part_binary<'a>(&self, value: &Cow<'a, [u8]>) -> Vec<u8> {
+        fn on_part_binary(&self, value: Cow<[u8]>) -> Vec<u8> {
             panic!("Unexpected part: {:?}", value)
         }
 
-        fn on_part_inline_binary<'a>(&self, value: &Cow<'a, [u8]>) -> Vec<u8> {
+        fn on_part_inline_binary(&self, value: Cow<[u8]>) -> Vec<u8> {
             panic!("Unexpected part: {:?}", value)
         }
     }

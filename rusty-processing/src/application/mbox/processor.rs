@@ -5,9 +5,9 @@ use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
 
 use crate::common::workspace::Workspace;
-use crate::process::{Process, ProcessContext, ProcessOutput, ProcessOutputType};
+use crate::processing::{Process, ProcessContext, ProcessOutput, ProcessOutputType};
 
-/// MboxProcessor is responsible for process mbox files.
+/// MboxProcessor is responsible for processing mbox files.
 ///
 /// Internally it uses the `mail_parser` crate to parse the mbox file.
 /// The processor only writes out embedded messages and doesn't produce any processed output.
@@ -39,7 +39,7 @@ impl MboxProcessor {
             message.contents(),
             &context.output_dir,
             mimetype,
-            &vec![],
+            &[],
         )?;
 
         Ok(ProcessOutput {
