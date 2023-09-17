@@ -1,9 +1,10 @@
+use std::{fs, path, thread};
 use std::fs::File;
-use std::io::Write;
-use std::{fs, path};
+use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
 use temporal_sdk::ActContext;
+use tokio::io::AsyncWrite;
 use tokio_stream::StreamExt;
 
 use crate::util::parse_s3_uri::parse_s3_uri;
@@ -20,7 +21,19 @@ pub struct DownloadOutput {
     pub bytes: usize,
 }
 
-pub async fn download(_ctx: ActContext, input: DownloadInput) -> anyhow::Result<DownloadOutput> {
+pub async fn pipe<FC, FP, T>(producer: FC, consumer: FP) -> T
+where FC: FnOnce(&mut dyn AsyncWrite) -> (),
+      FC: Send + 'static,
+      FP: FnOnce(&mut dyn Read) -> T,
+{
+    let (mut read, mut write) = tokio::io::duplex(1024);
+    thread::scope(|s| {
+        s.spawn(move || producer(&mut write));
+        consumer(&mut read)
+    })
+}
+
+pub async fn download(_ctx: ActContext, sink: impl Write) -> anyhow::Result<DownloadOutput> {
     let (bucket, key) = parse_s3_uri(input.source_s3_uri.as_str())?;
     let object = s3_client()
         .await

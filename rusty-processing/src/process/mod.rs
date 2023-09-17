@@ -1,8 +1,19 @@
-use std::str::FromStr;
+mod processor;
+mod process_context;
+mod process_output;
+mod process;
 
-/// The type of output to produce from processing.
+use std::str::FromStr;
+use serde::{Deserialize, Serialize};
+
+pub use self::processor::*;
+pub use self::process_output::*;
+pub(crate) use self::process_context::*;
+pub(crate) use self::process::*;
+
+/// The type of output to produce from process.
 ///
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub enum ProcessType {
     /// Extracted text of a file.
     ///

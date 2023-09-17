@@ -1,139 +1,151 @@
-use std::borrow::Cow;
-use std::fs::File;
 use std::io::{BufReader, Read};
-use std::path::PathBuf;
-use std::sync::Mutex;
-use std::thread;
 
 use anyhow::anyhow;
 use mail_parser::mailbox::mbox::{Message, MessageIterator};
+use serde::{Deserialize, Serialize};
 
 use crate::common::workspace::Workspace;
-use crate::processing::context::Context;
-use crate::processing::output::{Output, OutputInfo};
-use crate::processing::process::Process;
+use crate::process::{Process, ProcessContext, ProcessOutput, ProcessOutputType};
 
-/// MboxProcessor is responsible for processing mbox files.
+/// MboxProcessor is responsible for process mbox files.
 ///
 /// Internally it uses the `mail_parser` crate to parse the mbox file.
 /// The processor only writes out embedded messages and doesn't produce any processed output.
 ///
-pub struct MboxProcessor {
-    pub(super) context: Context,
-}
+#[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+pub struct MboxProcessor;
 
 impl MboxProcessor {
-    /// Creates a new MboxProcessor with the given context.
-    ///
-    pub fn new(context: Context) -> Self {
-        Self { context }
-    }
-
     /// Processes messages from an iterator.
     ///
-    fn process<T: Read>(&self, message_iter: MessageIterator<BufReader<T>>) {
-        thread::scope(|s| {
-            for message_result in message_iter {
-                s.spawn(|| {
-                    self.context.send_result(
-                        message_result
-                            .map_err(|err| anyhow!("failed to parse message from mbox: {:?}", err))
-                            .and_then(|message| self.write_message(&message)),
-                    )
-                });
+    fn write_messages<T: Read>(&self, message_iter: MessageIterator<BufReader<T>>, context: ProcessContext) {
+        for message_res in message_iter {
+            let message_res = message_res.map_err(|err| anyhow!("failed to parse message from mbox: {:?}", err));
+            match message_res {
+                Ok(message) => {
+                    let result = self.write_message(message, &context);
+                    context.add_result(result);
+                }
+                Err(e) => context.add_result(Err(e)),
             }
-        });
+        }
     }
 
     /// Writes a message to the output directory.
     ///
-    fn write_message(&self, message: &Message) -> anyhow::Result<Output> {
-        let context = Context {
-            output_dir: self.context.output_dir.clone(),
-            types: vec![],
-            mimetype: "message/rfc822".to_string(),
-            result_tx: Mutex::new(None),
-        };
+    fn write_message(&self, message: Message, context: &ProcessContext) -> anyhow::Result<ProcessOutput> {
+        let mimetype = "message/rfc822";
+        let Workspace { original_path, dupe_id, .. } = Workspace::new(
+            &message.contents(),
+            &context.output_dir,
+            mimetype,
+            &vec![],
+        )?;
 
-        let wkspace = Workspace::new(&context, &message.contents())?;
-        Ok(Output::Embedded(OutputInfo {
-            path: wkspace.original_path,
-            mimetype: context.mimetype,
-            dupe_id: wkspace.dupe_id,
-        }))
+        Ok(ProcessOutput {
+            path: original_path,
+            output_type: ProcessOutputType::Embedded,
+            mimetype: mimetype.to_string(),
+            dupe_id,
+        })
     }
 }
 
 impl Process for MboxProcessor {
-    fn handle_file(&self, source_file: &PathBuf) {
-        let result = File::open(source_file)
-            .map_err(|err| anyhow!("failed to open mbox file: {:?}", err))
-            .map(|file| MessageIterator::new(BufReader::new(file)))
-            .map(|message_iter| self.process(message_iter));
-
-        if let Err(err) = result {
-            self.context.send_result(Err(err));
-        }
-    }
-
-    fn handle_raw(&self, raw: Cow<[u8]>) {
-        let message_iter = MessageIterator::new(BufReader::new(raw.as_ref()));
-        self.process(message_iter);
+    fn process(&self, content: Box<dyn Read + Send + Sync>, context: ProcessContext) {
+        let reader = BufReader::new(content);
+        self.write_messages(MessageIterator::new(reader), context);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::path;
-    use std::sync::mpsc::Sender;
-
-    use crate::processing::context::Context;
+    use std::{path, thread};
+    use std::fs::File;
+    use std::sync::mpsc::Receiver;
 
     use super::*;
 
-    fn processor(tx: Sender<anyhow::Result<Output>>) -> anyhow::Result<MboxProcessor> {
+    fn processor_with_context() -> anyhow::Result<(MboxProcessor, ProcessContext, Receiver<anyhow::Result<ProcessOutput>>)> {
         let output_dir = tempfile::tempdir()?.into_path();
-        Ok(MboxProcessor::new(Context {
+        let (context, rx) = ProcessContext::new(
             output_dir,
-            mimetype: "application/mbox".to_string(),
-            types: vec![],
-            result_tx: std::sync::Mutex::new(Some(tx)),
-        }))
+            "application/mbox",
+            vec![],
+        );
+        Ok((MboxProcessor::default(), context, rx))
     }
 
-    #[test]
-    fn test_process_handle_file() -> anyhow::Result<()> {
-        let path = path::PathBuf::from("resources/mbox/ubuntu-no-small.mbox");
-
-        let (tx, rx) = std::sync::mpsc::channel();
-        let processor = processor(tx)?;
-
-        let mut outputs = thread::scope(move |s| {
-            s.spawn(move || processor.handle_file(&path));
-            rx.into_iter()
-                .map(|result| result.unwrap())
-                .collect::<Vec<Output>>()
-        });
-        // Sort to make the test deterministic.
+    fn sort_embedded_outputs(outputs: &mut Vec<ProcessOutput>) {
         outputs.sort_by(|a, b| {
-            match (a, b) {
-                (Output::Embedded(a), Output::Embedded(b)) => a.dupe_id.cmp(&b.dupe_id),
+            match (&a.output_type, &b.output_type) {
+                (ProcessOutputType::Embedded, ProcessOutputType::Embedded) => a.dupe_id.cmp(&b.dupe_id),
                 _ => panic!("expected embedded output"),
             }
         });
+    }
+
+    #[test]
+    fn test_process() -> anyhow::Result<()> {
+        let path = path::PathBuf::from("resources/mbox/ubuntu-no-small.mbox");
+        let (processor, context, mut rx) = processor_with_context()?;
+
+        let outputs = thread::scope(move |scope| {
+            let handle = thread::spawn(move || {
+                let file = Box::new(File::open(path).unwrap());
+                processor.process(file, context);
+            });
+
+            let mut outputs = vec![];
+            while let Ok(output) = rx.recv() {
+                outputs.push(output?)
+            }
+
+            // Sort to make the test deterministic
+            sort_embedded_outputs(&mut outputs);
+            anyhow::Ok(outputs)
+        })?;
 
         assert_eq!(outputs.len(), 2);
-        if let Output::Embedded(info) = &outputs[0] {
-            assert_eq!(info.mimetype, "message/rfc822");
-            assert_eq!(info.dupe_id, "4d338bc9f95d450a9372caa2fe0dfc97");
-        } else {
-            panic!("expected embedded output");
-        }
-        if let Output::Embedded(info) = &outputs[1] {
-            assert_eq!(info.mimetype, "message/rfc822");
-            assert_eq!(info.dupe_id, "5e574a8f0d36b8805722b4e5ef3b7fd9");
-        } else {
-            panic!("expected embedded output");
+
+        let output = & outputs[0];
+        assert_eq!(output.output_type, ProcessOutputType::Embedded);
+        assert_eq!(output.mimetype, "message/rfc822");
+        assert_eq!(output.dupe_id, "4d338bc9f95d450a9372caa2fe0dfc97");
+
+        let output = & outputs[1];
+        assert_eq!(output.output_type, ProcessOutputType::Embedded);
+        assert_eq!(output.mimetype, "message/rfc822");
+        assert_eq!(output.dupe_id, "5e574a8f0d36b8805722b4e5ef3b7fd9");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_process_large_file() -> anyhow::Result<()> {
+        let path = path::PathBuf::from("resources/mbox/ubuntu-no.mbox");
+        let (processor, context, mut rx) = processor_with_context()?;
+
+        let outputs = thread::scope(|scope| {
+            scope.spawn(|| {
+                let file = Box::new(File::open(path).unwrap());
+                processor.process(file, context);
+            });
+
+            let mut outputs = vec![];
+            while let Ok(output) = rx.recv() {
+                outputs.push(output?)
+            }
+
+            // Sort to make the test deterministic
+            sort_embedded_outputs(&mut outputs);
+            anyhow::Ok(outputs)
+        })?;
+
+        assert_eq!(outputs.len(), 344);
+        for output in outputs {
+            assert_eq!(output.output_type, ProcessOutputType::Embedded);
+            assert_eq!(output.mimetype, "message/rfc822");
         }
 
         Ok(())

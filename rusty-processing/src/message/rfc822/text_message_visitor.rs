@@ -86,8 +86,8 @@ mod test {
 
         let expected_content = "\
 Date: 2021-02-21T07:58:00-08:00
-From: <rusty.processing@mime.com>
-To: <processing.rusty@emim.com>
+From: <rusty.process@mime.com>
+To: <process.rusty@emim.com>
 Subject: Now THATS A LOT OF RUST
 
 This is a rusty email

@@ -20,8 +20,8 @@ pub fn message_dupe_identifier() -> &'static IdentifyDupeService {
 /// Identifies a message by its message ID, or if it doesn't have one, by a
 /// randomly generated UUID.
 ///
-#[derive(Default)]
-pub struct MessageDupeIdentifier {}
+#[derive(Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MessageDupeIdentifier;
 
 impl Identify for MessageDupeIdentifier {
     fn identify(&self, raw: &[u8]) -> String {

@@ -113,8 +113,8 @@ mod test {
 
         let expected_content = "\
 <div><b>Date</b>: 2021-02-21T07:58:00-08:00</div>
-<div><b>From</b>: &lt;rusty.processing@mime.com&gt;</div>
-<div><b>To</b>: &lt;processing.rusty@emim.com&gt;</div>
+<div><b>From</b>: &lt;rusty.process@mime.com&gt;</div>
+<div><b>To</b>: &lt;process.rusty@emim.com&gt;</div>
 <div><b>Subject</b>: Now THATS A LOT OF RUST</div>
 <br>
 <div><p>This is a rusty email</p>

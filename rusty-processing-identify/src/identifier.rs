@@ -4,8 +4,8 @@ use crate::message_dupe_identifier::message_dupe_identifier;
 
 /// Returns the [`IdentifyDupeService`] singleton for the given mimetype.
 ///
-pub fn identifier(mimetype: &String) -> &'static IdentifyDupeService {
-    match mimetype.as_str() {
+pub fn identifier(mimetype: impl AsRef<str>) -> &'static IdentifyDupeService {
+    match mimetype.as_ref() {
         "message/rfc822" => message_dupe_identifier(),
         _ => md5_dupe_identifier(),
     }

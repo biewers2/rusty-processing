@@ -1,10 +1,8 @@
 use std::path;
 
 use clap::Parser;
-use rusty_processing::common::output_type::ProcessType;
 
-use rusty_processing::processing::output::Output;
-use rusty_processing::processing::processor::processor;
+use rusty_processing::process::{processor, ProcessType};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -72,15 +70,14 @@ fn main() {
         args.types
     };
 
-    processor().process_file(
+    processor().process(
         args.input,
         args.output,
         args.mimetype,
         types,
         move |result| match result {
-            Ok(Output::Embedded(output)) => println!("Embedded: {:?}", output),
-            Ok(Output::Processed(output)) => println!("Processed: {:?}", output),
+            Ok(output) => println!("{:?}", output),
             Err(err) => println!("Error: {}", err),
         },
-    );
+    )
 }

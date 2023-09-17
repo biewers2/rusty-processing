@@ -167,7 +167,7 @@ mod test {
                     assert_eq!(
                         &Addr {
                             name: None,
-                            address: Some(Cow::from("rusty.processing@mime.com"))
+                            address: Some(Cow::from("rusty.process@mime.com"))
                         },
                         address
                     );
@@ -177,7 +177,7 @@ mod test {
                     assert_eq!(
                         &Addr {
                             name: None,
-                            address: Some(Cow::from("processing.rusty@emim.com"))
+                            address: Some(Cow::from("process.rusty@emim.com"))
                         },
                         address
                     );
@@ -210,7 +210,7 @@ mod test {
         fn on_header_text<'a>(&self, name: &str, text: &Cow<'a, str>) -> Option<String> {
             match name {
                 "Message-ID" => {
-                    assert_eq!("12345-headers-small@rusty-processing", text);
+                    assert_eq!("12345-headers-small@rusty-process", text);
                     Some("Message-ID header".to_string())
                 }
                 "Subject" => {

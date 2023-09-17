@@ -16,8 +16,8 @@ pub fn md5_dupe_identifier() -> &'static IdentifyDupeService {
 ///
 /// This identifier uses the MD5 hash of the raw bytes to identify duplicates.
 ///
-#[derive(Default, Debug)]
-pub struct Md5DupeIdentifier {}
+#[derive(Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Md5DupeIdentifier;
 
 impl Identify for Md5DupeIdentifier {
     fn identify(&self, raw: &[u8]) -> String {

@@ -13,8 +13,8 @@ use rusty_processing_temporal::activities::download::download;
 use rusty_processing_temporal::activities::process_rusty_file::process_rusty_file;
 use rusty_processing_temporal::activities::upload::upload;
 
-const WORKER_BUILD_ID: &'static str = "rusty-mime-processing-builder";
-const TASK_QUEUE: &'static str = "rusty-mime-processing";
+const WORKER_BUILD_ID: &'static str = "rusty-mime-process-builder";
+const TASK_QUEUE: &'static str = "rusty-mime-process";
 const NAMESPACE: &'static str = "default";
 
 #[tokio::main]

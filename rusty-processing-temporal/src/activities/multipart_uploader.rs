@@ -35,7 +35,7 @@ impl MultipartUploader {
 
     async fn upload_parts(
         &self,
-        upload_id: &String,
+        upload_id: &dyn AsRef<str>,
         file: &mut File,
     ) -> anyhow::Result<Vec<CompletedPart>> {
         let mut parts = vec![];
@@ -52,7 +52,7 @@ impl MultipartUploader {
                 .upload_part()
                 .bucket(&self.bucket)
                 .key(&self.key)
-                .upload_id(upload_id)
+                .upload_id(upload_id.as_ref())
                 .body(ByteStream::from(buf.to_vec()))
                 .part_number(part_num)
                 .send()
@@ -73,7 +73,7 @@ impl MultipartUploader {
 
     async fn complete_upload(
         &self,
-        upload_id: &String,
+        upload_id: &dyn AsRef<str>,
         parts: Vec<CompletedPart>,
     ) -> anyhow::Result<()> {
         let completed_multipart_upload = CompletedMultipartUpload::builder()
@@ -86,7 +86,7 @@ impl MultipartUploader {
             .bucket(&self.bucket)
             .key(&self.key)
             .multipart_upload(completed_multipart_upload)
-            .upload_id(upload_id)
+            .upload_id(upload_id.as_ref())
             .send()
             .await?;
 

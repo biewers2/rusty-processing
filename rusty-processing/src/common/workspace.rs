@@ -1,13 +1,9 @@
-use std::fs::File;
-use std::io::Write;
 use std::path;
-use std::path::PathBuf;
+
 use rusty_processing_identify::identifier::identifier;
 
-use crate::common::mime_extension_map::map_to_file_ext;
-use crate::common::output_type::ProcessType;
 use crate::common::util;
-use crate::processing::context::Context;
+use crate::process::ProcessType;
 
 /// A workspace defines a directory tree schematic.
 ///
@@ -17,7 +13,7 @@ use crate::processing::context::Context;
 /// The schematic is defined as such:
 ///   ${context.output_dir}/
 ///     <dupe_id_of_original>/
-///       original.<ext>
+///       original
 ///       extracted.txt
 ///       metadata.json
 ///       rendered.pdf
@@ -42,107 +38,86 @@ pub struct Workspace {
 impl Workspace {
     /// Create a new workspace given a context containing the output directory, and the content of the original file to work on.
     ///
-    pub fn new(context: &Context, content: &[u8]) -> anyhow::Result<Workspace> {
-        let dupe_id = identifier(&context.mimetype).identify(content);
-        let dir = context.output_dir.join(&dupe_id);
+    pub fn new(
+        content: &[u8],
+        output_dir: impl Into<path::PathBuf>,
+        mimetype: impl AsRef<str>,
+        types: &Vec<ProcessType>
+    ) -> anyhow::Result<Workspace> {
+        let dupe_id = identifier(&mimetype).identify(content);
+        let entry_dir = output_dir.into().join(&dupe_id);
 
-        let original_path = dir.join(format!("original.{}", map_to_file_ext(&context.mimetype)));
+        let original_path = entry_dir.join("original");
         util::write_file(&original_path, content)?;
 
-        let text_path = context
-            .should_process_type(&ProcessType::Text)
-            .then(|| dir.join("extracted.txt"))
+        let text_path = types.contains(&ProcessType::Text)
+            .then(|| entry_dir.join("extracted.txt"))
             .and_then(|path| (!path.exists()).then(|| path));
-        let metadata_path = context
-            .should_process_type(&ProcessType::Metadata)
-            .then(|| dir.join("metadata.json"))
+        let metadata_path = types.contains(&ProcessType::Metadata)
+            .then(|| entry_dir.join("metadata.json"))
             .and_then(|path| (!path.exists()).then(|| path));
-        let pdf_path = context
-            .should_process_type(&ProcessType::Pdf)
-            .then(|| dir.join("rendered.pdf"))
+        let pdf_path = types.contains(&ProcessType::Pdf)
+            .then(|| entry_dir.join("rendered.pdf"))
             .and_then(|path| (!path.exists()).then(|| path));
 
         Ok(Workspace {
             dupe_id,
-            entry_dir: dir,
+            entry_dir,
             original_path,
             text_path,
             metadata_path,
             pdf_path,
         })
     }
-
-    /// Creates a writer for the extracted text to be written to.
-    /// 
-    pub fn text_writer(&self) -> anyhow::Result<Option<Box<dyn Write>>> {
-        self.writer(&self.text_path)
-    }
-    
-    /// Creates a writer for the metadata JSON to be written to.
-    /// 
-    pub fn metadata_writer(&self) -> anyhow::Result<Option<Box<dyn Write>>> {
-        self.writer(&self.metadata_path)
-    }
-    
-    /// Creates a writer for the rendered PDF to be written to.
-    /// 
-    pub fn pdf_writer(&self) -> anyhow::Result<Option<Box<dyn Write>>> {
-        self.writer(&self.pdf_path)
-    }
-    
-    fn writer(&self, path: &Option<PathBuf>) -> anyhow::Result<Option<Box<dyn Write>>> {
-        Ok(path.as_ref()
-            .map(|path| File::create(&path)).transpose()?
-            .map(|file| Box::new(file) as Box<dyn Write>))
-    }
 }
 
 #[cfg(test)]
 mod test {
-    use std::sync::Mutex;
-
+    use lazy_static::lazy_static;
     use super::*;
 
     #[test]
     fn test_workspace_no_types() -> anyhow::Result<()> {
         let output_dir = tempfile::tempdir()?.into_path();
+        let mimetype = "text/plain".to_string();
         let dupe_id = "3adbbad1791fbae3ec908894c4963870";
         let dir = output_dir.join(dupe_id);
-        let ctx = Context {
-            output_dir,
-            mimetype: "text/plain".to_string(),
-            types: vec![],
-            result_tx: Mutex::new(None),
-        };
 
-        let workspace = Workspace::new(&ctx, b"hello, world!")?;
+        let workspace = Workspace::new(
+            b"hello, world!",
+            &output_dir,
+            &mimetype,
+            &vec![],
+        )?;
 
         assert_eq!(workspace.dupe_id, dupe_id);
         assert_eq!(workspace.entry_dir, dir);
-        assert_eq!(workspace.original_path, dir.join("original.txt"));
+        assert_eq!(workspace.original_path, dir.join("original"));
         assert_eq!(workspace.text_path, None);
         assert_eq!(workspace.metadata_path, None);
         assert_eq!(workspace.pdf_path, None);
+
         Ok(())
     }
 
     #[test]
     fn test_workspace_all_types() -> anyhow::Result<()> {
         let output_dir = tempfile::tempdir()?.into_path();
+        let mimetype = "text/plain".to_string();
+        let types = vec![ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf];
         let dupe_id = "3adbbad1791fbae3ec908894c4963870";
         let dir = output_dir.join(dupe_id);
-        let ctx = Context {
-            output_dir,
-            mimetype: "text/plain".to_string(),
-            types: vec![ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf],
-            result_tx: Mutex::new(None),
-        };
 
-        let workspace = Workspace::new(&ctx, b"hello, world!")?;
+        let workspace = Workspace::new(
+            b"hello, world!",
+            &output_dir,
+            &mimetype,
+            &types,
+        )?;
 
         assert_eq!(workspace.dupe_id, dupe_id);
         assert_eq!(workspace.entry_dir, dir);
-        assert_eq!(workspace.original_path, dir.join("original.txt"));
+        assert_eq!(workspace.original_path, dir.join("original"));
         assert_eq!(workspace.text_path, Some(dir.join("extracted.txt")));
         assert_eq!(workspace.metadata_path, Some(dir.join("metadata.json")));
         assert_eq!(workspace.pdf_path, Some(dir.join("rendered.pdf")));
