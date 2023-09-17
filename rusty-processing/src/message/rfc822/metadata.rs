@@ -39,10 +39,9 @@ impl Rfc822Processor {
         let formatted_atts = message
             .attachments()
             .map(|att| att.attachment_name())
-            .filter(|att| att.is_some())
-            .map(|att| att.unwrap())
+            .flatten()
             .collect::<Vec<&str>>()
             .join(", ");
-        (!formatted_atts.is_empty()).then(|| formatted_atts)
+        (!formatted_atts.is_empty()).then_some(formatted_atts)
     }
 }

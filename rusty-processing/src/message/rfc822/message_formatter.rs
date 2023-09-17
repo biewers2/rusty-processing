@@ -33,13 +33,12 @@ impl MessageFormatter {
             .then(|| {
                 addresses
                     .iter()
-                    .map(|addr| self.format_address(&addr))
-                    .filter(|addr| addr.is_some())
-                    .map(|addr| addr.unwrap())
+                    .map(|addr| self.format_address(addr))
+                    .flatten()
                     .collect::<Vec<String>>()
                     .join(", ")
             })
-            .and_then(|value| (!value.is_empty()).then(|| value))
+            .and_then(|value| (!value.is_empty()).then_some(value))
     }
 
     /// Formats a `Group` into an optional `String`.
@@ -73,13 +72,12 @@ impl MessageFormatter {
             .then(|| {
                 groups
                     .iter()
-                    .map(|group| self.format_group(&group))
-                    .filter(|group| group.is_some())
-                    .map(|group| group.unwrap())
+                    .map(|group| self.format_group(group))
+                    .flatten()
                     .collect::<Vec<String>>()
                     .join(", ")
             })
-            .and_then(|value| (!value.is_empty()).then(|| value))
+            .and_then(|value| (!value.is_empty()).then_some(value))
     }
 
     /// Formats a list of `String` into an optional `String`.

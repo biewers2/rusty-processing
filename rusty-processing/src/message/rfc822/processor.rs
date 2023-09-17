@@ -34,9 +34,9 @@ impl Rfc822Processor {
 
     /// Extracts the text from the message and emits it as processed output.
     ///
-    fn process_text<'a>(
+    fn process_text(
         &self,
-        message: &Message<'a>,
+        message: &Message<'_>,
         path: impl AsRef<path::Path>,
         dupe_id: impl Into<String>,
         context: &ProcessContext,
@@ -57,9 +57,9 @@ impl Rfc822Processor {
 
     /// Extracts the metadata from the message and emits it as processed output.
     ///
-    fn process_metadata<'a>(
+    fn process_metadata(
         &self,
-        message: &Message<'a>,
+        message: &Message<'_>,
         path: impl AsRef<path::Path>,
         dupe_id: impl Into<String>,
         context: &ProcessContext,
@@ -80,9 +80,9 @@ impl Rfc822Processor {
 
     /// Renders a PDF from the message and emits it as processed output.
     ///
-    fn process_pdf<'a>(
+    fn process_pdf(
         &self,
-        message: &Message<'a>,
+        message: &Message<'_>,
         path: impl AsRef<path::Path>,
         dupe_id: impl Into<String>,
         context: &ProcessContext,
@@ -103,7 +103,7 @@ impl Rfc822Processor {
 
     /// Discovers any attachments in the message and emits them as embedded output.
     ///
-    fn process_attachments<'a>(&self, message: &Message<'a>, context: &ProcessContext) -> anyhow::Result<()> {
+    fn process_attachments(&self, message: &Message<'_>, context: &ProcessContext) -> anyhow::Result<()> {
         for part_id in &message.attachments {
             let part = message
                 .part(*part_id)

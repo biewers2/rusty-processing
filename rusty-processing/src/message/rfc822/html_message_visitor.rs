@@ -81,7 +81,7 @@ impl MessageVisitor for HtmlMessageVisitor {
 
     fn on_part_text(&self, value: &Cow<str>) -> String {
         value
-            .split("\n")
+            .split('\n')
             .map(|line| format!("<p>{}</p>", encode_text(line)))
             .collect::<Vec<String>>()
             .join("\n")

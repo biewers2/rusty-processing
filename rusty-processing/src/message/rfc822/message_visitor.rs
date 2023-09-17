@@ -25,34 +25,34 @@ pub trait MessageVisitor {
 
     // Header visitors
 
-    fn on_header_received<'a>(&self, _name: &str, _received: &Received<'a>) -> Option<String> {
+    fn on_header_received(&self, _name: &str, _received: &Received<'_>) -> Option<String> {
         None
     }
 
-    fn on_header_addresses<'a>(
+    fn on_header_addresses(
         &self,
         _name: &str,
-        _address_list: &Vec<Addr<'a>>,
+        _address_list: &Vec<Addr<'_>>,
     ) -> Option<String> {
         None
     }
 
-    fn on_header_groups<'a>(
+    fn on_header_groups(
         &self,
         _name: &str,
-        _group_list: &Vec<Group<'a>>,
+        _group_list: &Vec<Group<'_>>,
     ) -> Option<String> {
         None
     }
 
-    fn on_header_text<'a>(&self, _name: &str, _text: &Cow<'a, str>) -> Option<String> {
+    fn on_header_text(&self, _name: &str, _text: &Cow<'_, str>) -> Option<String> {
         None
     }
 
-    fn on_header_text_list<'a>(
+    fn on_header_text_list(
         &self,
         _name: &str,
-        _text_list: &Vec<Cow<'a, str>>,
+        _text_list: &Vec<Cow<'_, str>>,
     ) -> Option<String> {
         None
     }
@@ -61,25 +61,25 @@ pub trait MessageVisitor {
         None
     }
 
-    fn on_header_content_type<'a>(&self, _content_type: &ContentType<'a>) -> Option<String> {
+    fn on_header_content_type(&self, _content_type: &ContentType<'_>) -> Option<String> {
         None
     }
 
     // Body part visitors
 
-    fn on_part_text<'a>(&self, value: &Cow<'a, str>) -> String {
+    fn on_part_text(&self, value: &Cow<'_, str>) -> String {
         value.to_string()
     }
 
-    fn on_part_html<'a>(&self, value: &Cow<'a, str>) -> String {
+    fn on_part_html(&self, value: &Cow<'_, str>) -> String {
         value.to_string()
     }
 
-    fn on_part_binary<'a>(&self, value: &Cow<'a, [u8]>) -> Vec<u8> {
+    fn on_part_binary(&self, value: &Cow<'_, [u8]>) -> Vec<u8> {
         value.to_vec()
     }
 
-    fn on_part_inline_binary<'a>(&self, value: &Cow<'a, [u8]>) -> Vec<u8> {
+    fn on_part_inline_binary(&self, value: &Cow<'_, [u8]>) -> Vec<u8> {
         value.to_vec()
     }
 }

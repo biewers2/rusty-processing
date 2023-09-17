@@ -32,7 +32,7 @@ impl MessageTransformer {
             if let Some(header_value) = self.transform_header(header.name(), header.value()) {
                 self.write_if_some(writer, self.visitor.on_header_prefix())?;
 
-                let value = format!("{}", header_value);
+                let value = header_value.to_string();
                 writer.write_all(value.as_bytes())?;
 
                 self.write_if_some(writer, self.visitor.on_header_suffix())?;
@@ -74,12 +74,12 @@ impl MessageTransformer {
             HeaderValue::TextList(text_list) => self.visitor.on_header_text_list(name, text_list),
 
             HeaderValue::DateTime(date_time) => {
-                println!("{}", date_time.to_string());
+                println!("{}", date_time);
                 self.visitor.on_header_date_time(name, date_time)
             }
 
             HeaderValue::ContentType(content_type) => {
-                self.visitor.on_header_content_type(&content_type)
+                self.visitor.on_header_content_type(content_type)
             }
 
             HeaderValue::Empty => None,
