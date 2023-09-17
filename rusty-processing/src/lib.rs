@@ -18,9 +18,10 @@ pub mod common;
 ///
 pub mod process;
 
-// pub(crate) mod message {
-//     pub mod rfc822;
-// }
+pub(crate) mod message {
+    pub mod rfc822;
+}
+
 pub(crate) mod application {
     pub mod mbox;
 }

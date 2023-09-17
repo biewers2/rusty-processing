@@ -28,10 +28,10 @@ impl MessageFormatter {
     ///
     /// The address are formatted using `format_address` and then concatenated into a single string separated by ", ".
     ///
-    pub fn format_address_list(&self, address_list: &Vec<Addr>) -> Option<String> {
-        (!address_list.is_empty())
+    pub fn format_addresses(&self, addresses: &Vec<Addr>) -> Option<String> {
+        (!addresses.is_empty())
             .then(|| {
-                address_list
+                addresses
                     .iter()
                     .map(|addr| self.format_address(&addr))
                     .filter(|addr| addr.is_some())
@@ -55,7 +55,7 @@ impl MessageFormatter {
     ///
     pub fn format_group(&self, group: &Group) -> Option<String> {
         let name = group.name.as_ref().map(|s| s.to_string());
-        let addresses = self.format_address_list(&group.addresses);
+        let addresses = self.format_addresses(&group.addresses);
         self.format_name_address(&name, &addresses)
     }
 
@@ -68,10 +68,10 @@ impl MessageFormatter {
     /// ```text
     /// "GroupName1 <Name1 <address1@domain1>, ...>, GroupName2 <Name1 <address1@domain1>, ...>, ...>"
     /// ```
-    pub fn format_group_list(&self, group_list: &Vec<Group>) -> Option<String> {
-        (!group_list.is_empty())
+    pub fn format_groups(&self, groups: &Vec<Group>) -> Option<String> {
+        (!groups.is_empty())
             .then(|| {
-                group_list
+                groups
                     .iter()
                     .map(|group| self.format_group(&group))
                     .filter(|group| group.is_some())
@@ -178,7 +178,7 @@ mod test {
         ];
 
         for (addrs, expected) in cases {
-            let actual = formatter.format_address_list(&addrs);
+            let actual = formatter.format_addresses(&addrs);
             assert_eq!(expected, actual);
         }
 
@@ -244,7 +244,7 @@ mod test {
         ];
 
         for (groups, expected) in cases {
-            let actual = formatter.format_group_list(&groups);
+            let actual = formatter.format_groups(&groups);
             assert_eq!(expected, actual);
         }
 

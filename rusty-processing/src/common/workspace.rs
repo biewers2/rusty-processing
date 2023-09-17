@@ -52,13 +52,13 @@ impl Workspace {
 
         let text_path = types.contains(&ProcessType::Text)
             .then(|| entry_dir.join("extracted.txt"))
-            .and_then(|path| (!path.exists()).then(|| path));
+            .and_then(|path| (!path.exists()).then_some(path));
         let metadata_path = types.contains(&ProcessType::Metadata)
             .then(|| entry_dir.join("metadata.json"))
-            .and_then(|path| (!path.exists()).then(|| path));
+            .and_then(|path| (!path.exists()).then_some(path));
         let pdf_path = types.contains(&ProcessType::Pdf)
             .then(|| entry_dir.join("rendered.pdf"))
-            .and_then(|path| (!path.exists()).then(|| path));
+            .and_then(|path| (!path.exists()).then_some(path));
 
         Ok(Workspace {
             dupe_id,

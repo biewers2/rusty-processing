@@ -17,27 +17,19 @@ impl MessageVisitor for TextMessageVisitor {
         Some("\n".to_string())
     }
 
-    fn on_header_address(&self, header_name: &str, address: &Addr) -> Option<String> {
-        self.formatter
-            .format_address(address)
-            .map(|value| format!("{}: {}", header_name, value))
-    }
+    // fn on_header_received<'a>(&self, _name: &str, _received: &Received<'a>) -> Option<String> {
+    //     todo!()
+    // }
 
-    fn on_header_address_list(&self, name: &str, address_list: &Vec<Addr>) -> Option<String> {
+    fn on_header_addresses(&self, name: &str, address_list: &Vec<Addr>) -> Option<String> {
         self.formatter
-            .format_address_list(address_list)
+            .format_addresses(address_list)
             .map(|addrs| format!("{}: {}", name, addrs))
     }
 
-    fn on_header_group(&self, header_name: &str, group: &Group) -> Option<String> {
+    fn on_header_groups(&self, name: &str, group_list: &Vec<Group>) -> Option<String> {
         self.formatter
-            .format_group(group)
-            .map(|value| format!("{}: {}", header_name, value))
-    }
-
-    fn on_header_group_list(&self, name: &str, group_list: &Vec<Group>) -> Option<String> {
-        self.formatter
-            .format_group_list(group_list)
+            .format_groups(group_list)
             .map(|groups| format!("{}: {}", name, groups))
     }
 
@@ -68,16 +60,18 @@ impl MessageVisitor for TextMessageVisitor {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use anyhow::anyhow;
+    use mail_parser::MessageParser;
+
     use crate::message::rfc822::transformer::MessageTransformer;
     use crate::test_util;
-    use anyhow::anyhow;
-    use mail_parser::Message;
+
+    use super::*;
 
     #[test]
     fn test_text_message_visitor() -> anyhow::Result<()> {
         let content = test_util::read_contents("resources/rfc822/headers-small.eml")?;
-        let message = Message::parse(&content).ok_or(anyhow!("Failed to parse message"))?;
+        let message = MessageParser::default().parse(&content).ok_or(anyhow!("Failed to parse message"))?;
         let visitor = Box::<TextMessageVisitor>::default();
         let transformer = MessageTransformer::new(visitor);
 
@@ -86,8 +80,8 @@ mod test {
 
         let expected_content = "\
 Date: 2021-02-21T07:58:00-08:00
-From: <rusty.process@mime.com>
-To: <process.rusty@emim.com>
+From: <rusty.processing@mime.com>
+To: <processing.rusty@emim.com>
 Subject: Now THATS A LOT OF RUST
 
 This is a rusty email

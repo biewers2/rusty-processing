@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use mail_parser::{HeaderValue, Message, MessagePart, PartType};
+use mail_parser::{Address, HeaderValue, Message, MessagePart, PartType};
 
 use crate::message::rfc822::message_visitor::MessageVisitor;
 
@@ -60,16 +60,13 @@ impl MessageTransformer {
     ///
     fn transform_header(&self, name: &str, value: &HeaderValue) -> Option<String> {
         match value {
-            HeaderValue::Address(addr) => self.visitor.on_header_address(name, addr),
-
-            HeaderValue::AddressList(addr_list) => {
-                self.visitor.on_header_address_list(name, addr_list)
+            HeaderValue::Received(recv) => {
+                self.visitor.on_header_received(name, recv)
             }
 
-            HeaderValue::Group(group) => self.visitor.on_header_group(name, group),
-
-            HeaderValue::GroupList(group_list) => {
-                self.visitor.on_header_group_list(name, group_list)
+            HeaderValue::Address(addr) => match addr {
+                Address::List(addresses) => self.visitor.on_header_addresses(name, addresses),
+                Address::Group(groups) => self.visitor.on_header_groups(name, groups),
             }
 
             HeaderValue::Text(text) => self.visitor.on_header_text(name, text),
@@ -154,52 +151,51 @@ mod test {
 
     use crate::test_util;
     use anyhow::anyhow;
-    use mail_parser::{Addr, ContentType, DateTime, Group};
+    use mail_parser::{Addr, ContentType, DateTime, Group, Host, MessageParser, Received};
 
     use super::*;
 
     struct TestVisitor;
 
     impl MessageVisitor for TestVisitor {
-        fn on_header_address<'a>(&'a self, name: &str, address: &Addr<'a>) -> Option<String> {
-            match name {
-                "From" => {
-                    assert_eq!(
-                        &Addr {
-                            name: None,
-                            address: Some(Cow::from("rusty.process@mime.com"))
-                        },
-                        address
-                    );
+        fn on_header_received<'a>(&self, _name: &str, received: &Received<'a>) -> Option<String> {
+            match &received.from {
+                Some(Host::Name(name)) => {
+                    assert_eq!("rusty-processing", name);
                     Some("From header".to_string())
                 }
-                "To" => {
-                    assert_eq!(
-                        &Addr {
-                            name: None,
-                            address: Some(Cow::from("process.rusty@emim.com"))
-                        },
-                        address
-                    );
-                    Some("To header".to_string())
+                Some(v) => {
+                    panic!("Unexpected form for received: {}", v.to_string());
                 }
-                _ => panic!("Unexpected header: {}", name),
+                _ => None
             }
         }
 
-        fn on_header_address_list<'a>(
+        fn on_header_addresses<'a>(
             &self,
             name: &str,
-            address_list: &Vec<Addr<'a>>,
+            addresses: &Vec<Addr<'a>>,
         ) -> Option<String> {
-            panic!("Unexpected header: ({}, {:?})", name, address_list)
+            match name {
+                "From" => {
+                    assert_eq!(
+                        Some(&Addr { name: None, address: Some(Cow::from("rusty.processing@mime.com")) }),
+                        addresses.get(0),
+                    );
+                    Some("From header".to_string())
+                },
+                "To" => {
+                    assert_eq!(
+                        Some(&Addr { name: None, address: Some(Cow::from("processing.rusty@emim.com")) }),
+                        addresses.get(0),
+                    );
+                    Some("To header".to_string())
+                }
+                _ => None
+            }
         }
 
-        fn on_header_group<'a>(&self, name: &str, group: &Group<'a>) -> Option<String> {
-            panic!("Unexpected header: ({}, {:?})", name, group)
-        }
-
-        fn on_header_group_list<'a>(
+        fn on_header_groups<'a>(
             &self,
             name: &str,
             group_list: &Vec<Group<'a>>,
@@ -210,7 +206,7 @@ mod test {
         fn on_header_text<'a>(&self, name: &str, text: &Cow<'a, str>) -> Option<String> {
             match name {
                 "Message-ID" => {
-                    assert_eq!("12345-headers-small@rusty-process", text);
+                    assert_eq!("12345-headers-small@rusty-processing", text);
                     Some("Message-ID header".to_string())
                 }
                 "Subject" => {
@@ -275,7 +271,7 @@ mod test {
     #[test]
     fn test_transform() -> anyhow::Result<()> {
         let content = test_util::read_contents("resources/rfc822/headers-small.eml")?;
-        let message = Message::parse(&content).ok_or(anyhow!("Failed to parse message"))?;
+        let message = MessageParser::default().parse(&content).ok_or(anyhow!("Failed to parse message"))?;
         let transformer = MessageTransformer::new(Box::new(TestVisitor {}));
 
         let mut content = vec![];

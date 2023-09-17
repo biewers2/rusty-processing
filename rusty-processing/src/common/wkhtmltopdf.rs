@@ -37,7 +37,7 @@ pub struct Wkhtmltopdf {}
 impl Wkhtmltopdf {
     pub fn run(&self, input: &[u8], output: &mut Vec<u8>) -> anyhow::Result<ExitStatus> {
         let mut proc = Command::new("wkhtmltopdf")
-            .args(&DEFAULT_ARGS)
+            .args(DEFAULT_ARGS)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

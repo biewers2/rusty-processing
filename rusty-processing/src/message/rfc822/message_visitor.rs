@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use mail_parser::{Addr, ContentType, DateTime, Group};
+use mail_parser::{Addr, ContentType, DateTime, Group, Received};
 
 pub trait MessageVisitor {
     fn on_header_prefix(&self) -> Option<String> {
@@ -25,11 +25,11 @@ pub trait MessageVisitor {
 
     // Header visitors
 
-    fn on_header_address<'a>(&'a self, _name: &str, _address: &Addr<'a>) -> Option<String> {
+    fn on_header_received<'a>(&self, _name: &str, _received: &Received<'a>) -> Option<String> {
         None
     }
 
-    fn on_header_address_list<'a>(
+    fn on_header_addresses<'a>(
         &self,
         _name: &str,
         _address_list: &Vec<Addr<'a>>,
@@ -37,11 +37,7 @@ pub trait MessageVisitor {
         None
     }
 
-    fn on_header_group<'a>(&self, _name: &str, _group: &Group<'a>) -> Option<String> {
-        None
-    }
-
-    fn on_header_group_list<'a>(
+    fn on_header_groups<'a>(
         &self,
         _name: &str,
         _group_list: &Vec<Group<'a>>,

@@ -36,7 +36,7 @@ impl MboxProcessor {
     fn write_message(&self, message: Message, context: &ProcessContext) -> anyhow::Result<ProcessOutput> {
         let mimetype = "message/rfc822";
         let Workspace { original_path, dupe_id, .. } = Workspace::new(
-            &message.contents(),
+            message.contents(),
             &context.output_dir,
             mimetype,
             &vec![],

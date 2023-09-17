@@ -11,7 +11,7 @@ use crate::process::process::Process;
 use crate::process::process_output::ProcessOutput;
 
 lazy_static! {
-    static ref PROCESSOR: Processor = Processor::default();
+    static ref PROCESSOR: Processor = Processor;
 }
 
 /// Returns a reference to the global processor instance.
@@ -50,9 +50,9 @@ impl Processor {
         types: Vec<ProcessType>,
         handle_result: &mut F,
     ) -> anyhow::Result<()>
-        where F: FnMut(anyhow::Result<ProcessOutput>) -> () + Send + Sync,
+        where F: FnMut(anyhow::Result<ProcessOutput>) + Send + Sync,
     {
-        let (context, mut rx) = ProcessContext::new(
+        let (context, rx) = ProcessContext::new(
             output_dir,
             mimetype,
             types,
@@ -79,7 +79,7 @@ impl Processor {
 
     fn processor_for_mimetype(mimetype: &str) -> anyhow::Result<Box<dyn Process>> {
         match mimetype {
-            "application/mbox" => Ok(Box::new(MboxProcessor::default())),
+            "application/mbox" => Ok(Box::new(MboxProcessor)),
             // "message/rfc822" => Ok(Box::new(Rfc822Processor::default())),
             _ => Err(anyhow!("Unsupported MIME type: {}", mimetype)),
         }
