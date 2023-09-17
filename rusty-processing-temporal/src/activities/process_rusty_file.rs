@@ -40,7 +40,7 @@ pub async fn process_rusty_file(
             input.output_dir,
             input.mimetype,
             types,
-            move |result| tx.send(result).unwrap_or(()),
+            &mut move |result| tx.send(result).unwrap_or(()),
         ));
 
         while let Ok(result) = rx.recv() {

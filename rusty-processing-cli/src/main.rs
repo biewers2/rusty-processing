@@ -62,7 +62,7 @@ fn parse_directory_path(path_str: &str) -> Result<path::PathBuf, String> {
     }
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let types = if args.all {
         vec![ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf]
@@ -75,7 +75,7 @@ fn main() {
         args.output,
         args.mimetype,
         types,
-        move |result| match result {
+        &mut move |result| match result {
             Ok(output) => println!("{:?}", output),
             Err(err) => println!("Error: {}", err),
         },
