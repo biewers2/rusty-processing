@@ -2,20 +2,16 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use temporal_sdk::{sdk_client_options, Worker};
-use temporal_sdk_core::{init_worker, CoreRuntime};
+use temporal_sdk_core::{CoreRuntime, init_worker};
 use temporal_sdk_core_api::telemetry::TelemetryOptionsBuilder;
 use temporal_sdk_core_api::worker::WorkerConfigBuilder;
 use url::Url;
 
-use rusty_processing_temporal::activities::create_workspace::create_workspace;
-use rusty_processing_temporal::activities::destroy_workspace::destroy_workspace;
-use rusty_processing_temporal::activities::download::download;
 use rusty_processing_temporal::activities::process_rusty_file::process_rusty_file;
-use rusty_processing_temporal::activities::upload::upload;
 
-const WORKER_BUILD_ID: &'static str = "rusty-mime-process-builder";
-const TASK_QUEUE: &'static str = "rusty-mime-process";
-const NAMESPACE: &'static str = "default";
+const WORKER_BUILD_ID: &str = "rusty-mime-process-builder";
+const TASK_QUEUE: &str = "rusty-mime-process";
+const NAMESPACE: &str = "default";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -38,11 +34,7 @@ async fn start_worker() -> anyhow::Result<()> {
 
     let core_worker = init_worker(&runtime, worker_config, client)?;
     let mut worker = Worker::new_from_core(Arc::new(core_worker), TASK_QUEUE);
-    worker.register_activity("create_rusty_workspace", create_workspace);
-    worker.register_activity("destroy_rusty_workspace", destroy_workspace);
-    worker.register_activity("download_rusty_file", download);
     worker.register_activity("process_rusty_file", process_rusty_file);
-    worker.register_activity("upload_rusty_file", upload);
 
     worker.run().await
 }

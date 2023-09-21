@@ -1,5 +1,5 @@
-use std::fs::File;
 use std::{fs, path};
+use std::fs::File;
 
 use aws_sdk_s3::primitives::ByteStream;
 use byte_unit::n_mb_bytes;
@@ -7,7 +7,7 @@ use filesize::PathExt;
 use serde::Deserialize;
 use temporal_sdk::ActContext;
 
-use crate::activities::multipart_uploader::MultipartUploader;
+use crate::io::multipart_uploader::MultipartUploader;
 use crate::util::parse_s3_uri::parse_s3_uri;
 use crate::util::services::s3_client;
 
