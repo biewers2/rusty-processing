@@ -1,7 +1,9 @@
 use std::fmt::Debug;
-use std::path;
-use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
+use anyhow::anyhow;
+
+use futures::Stream;
+use tokio::sync::mpsc::Sender;
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::processing::process_output::ProcessOutput;
 use crate::processing::ProcessType;
@@ -10,10 +12,6 @@ use crate::processing::ProcessType;
 ///
 #[derive(Debug, Clone)]
 pub struct ProcessContext {
-    /// The path to the directory to write output files to.
-    ///
-    pub output_dir: path::PathBuf,
-
     /// The MIME type of the file to process.
     ///
     pub mimetype: String,
@@ -24,24 +22,23 @@ pub struct ProcessContext {
 
     /// A sender to send processing results
     ///
-    result_tx: Sender<anyhow::Result<ProcessOutput>>,
+    output_sink: Sender<anyhow::Result<ProcessOutput>>,
 }
 
 impl ProcessContext {
     pub fn new(
-        output_dir: path::PathBuf,
         mimetype: impl Into<String>,
-        types: Vec<ProcessType>,
-    ) -> (Self, Receiver<anyhow::Result<ProcessOutput>>) {
-        let (tx, rx) = mpsc::channel();
+        types: Vec<ProcessType>
+    ) -> (Self, impl Stream<Item=anyhow::Result<ProcessOutput>> + Send + Sync + Unpin) {
+        let (output_sink, output_stream) = tokio::sync::mpsc::channel(100);
+        let output_stream = Box::new(ReceiverStream::new(output_stream));
         let context = Self {
-            output_dir,
             mimetype: mimetype.into(),
             types,
-            result_tx: tx,
+            output_sink,
         };
 
-        (context, rx)
+        (context, output_stream)
     }
 
     pub fn with_mimetype(self, mimetype: impl Into<String>) -> Self {
@@ -51,7 +48,8 @@ impl ProcessContext {
         }
     }
 
-    pub fn add_result(&self, result: anyhow::Result<ProcessOutput>) {
-        self.result_tx.send(result).unwrap_or(());
+    pub async fn add_result(&self, result: anyhow::Result<ProcessOutput>) -> anyhow::Result<()> {
+        self.output_sink.send(result).await
+            .map_err(|e| anyhow!(e))
     }
 }

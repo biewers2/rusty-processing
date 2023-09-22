@@ -1,3 +1,4 @@
+
 /// Service for converting HTML to PDF.
 ///
 pub(crate) mod wkhtmltopdf;
@@ -9,3 +10,7 @@ pub(crate) mod wkhtmltopdf;
 pub(crate) mod workspace;
 
 pub(crate) mod util;
+
+mod readable_stream;
+
+pub(crate) use readable_stream::*;

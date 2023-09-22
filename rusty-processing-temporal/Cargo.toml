@@ -11,9 +11,8 @@ temporal-sdk = { git = "https://github.com/temporalio/sdk-core.git", branch = "m
 temporal-sdk-core-api = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 url = "~2.4.0"
-tokio-stream = "~0.1.14"
-tokio-util = "0.7.8"
 futures = "0.3"
+tokio-stream = "0.1"
 anyhow = "~1.0.75"
 serde = { version = "~1.0.186", features = ["derive"] }
 aws-config = "~0.56.1"
@@ -26,5 +25,5 @@ filesize = "~0.2.0"
 byte-unit = "~4.0.19"
 
 [dependencies.tokio]
-version = "1.32.0"
+version = "1.32"
 features = ["full"]

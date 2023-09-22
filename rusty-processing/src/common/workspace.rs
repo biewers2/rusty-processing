@@ -40,12 +40,13 @@ impl Workspace {
     ///
     pub fn new(
         content: &[u8],
-        output_dir: impl Into<path::PathBuf>,
         mimetype: impl AsRef<str>,
         types: &[ProcessType]
     ) -> anyhow::Result<Workspace> {
         let dupe_id = identifier(&mimetype).identify(content);
-        let entry_dir = output_dir.into().join(&dupe_id);
+
+        let output_dir = tempfile::tempdir()?.into_path();
+        let entry_dir = output_dir.join(&dupe_id);
 
         let original_path = entry_dir.join("original");
         util::write_file(&original_path, content)?;

@@ -3,8 +3,13 @@ use std::fs::File;
 use std::io::Read;
 
 use anyhow::anyhow;
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{Stream, try_join};
+use futures::future::Fuse;
 use mail_parser::{Message, MessageParser, MimeHeaders};
 use serde::{Deserialize, Serialize};
+use crate::common::StreamReader;
 
 use crate::common::util::mimetype;
 use crate::common::workspace::Workspace;
@@ -16,94 +21,107 @@ pub struct Rfc822Processor;
 impl Rfc822Processor {
     /// Processes a message by extracting text and metadata, rendering a PDF, and then finding any embedded attachments.
     ///
-    fn process(&self, message: Message<'_>, context: &ProcessContext) -> anyhow::Result<()> {
+    async fn process(&self, message: Message<'_>, context: &ProcessContext) -> anyhow::Result<()> {
         let wkspace = Workspace::new(
             &message.raw_message,
-            &context.output_dir,
             &context.mimetype,
             &context.types
         )?;
 
-        wkspace.text_path.as_ref().map(|path| self.process_text(&message, path, &wkspace.dupe_id, context));
-        wkspace.metadata_path.as_ref().map(|path| self.process_metadata(&message, path, &wkspace.dupe_id, context));
-        wkspace.pdf_path.as_ref().map(|path| self.process_pdf(&message, path, &wkspace.dupe_id, context));
-        self.process_attachments(&message, context)?;
+        let text_fut = self.process_text(&message, wkspace.text_path, &wkspace.dupe_id, context);
+        let meta_fut = self.process_metadata(&message, wkspace.metadata_path, &wkspace.dupe_id, context);
+        let pdf_fut = self.process_pdf(&message, wkspace.pdf_path, &wkspace.dupe_id, context);
+        let attach_fut = self.process_attachments(&message, context);
 
+        try_join!(text_fut, meta_fut, pdf_fut, attach_fut)?;
+        Ok(())
+    }
+
+    async fn empty() -> anyhow::Result<()> {
         Ok(())
     }
 
     /// Extracts the text from the message and emits it as processed output.
     ///
-    fn process_text(
+    async fn process_text(
         &self,
         message: &Message<'_>,
-        path: impl AsRef<path::Path>,
+        path: Option<impl AsRef<path::Path>>,
         dupe_id: impl Into<String>,
         context: &ProcessContext,
     ) -> anyhow::Result<()> {
-        let mut writer = File::create(&path)?;
-        let result = self.extract_text(message, &mut writer).map(|_| {
-            ProcessOutput {
-                path: path.as_ref().to_path_buf(),
-                output_type: ProcessOutputType::Processed,
-                mimetype: "text/plain".to_string(),
-                dupe_id: dupe_id.into(),
-            }
-        });
-        context.add_result(result);
+        if let Some(path) = path {
+            let mut writer = File::create(&path)?;
+            let result = self.extract_text(message, &mut writer).map(|_| {
+                ProcessOutput {
+                    path: path.as_ref().to_path_buf(),
+                    output_type: ProcessOutputType::Processed,
+                    mimetype: "text/plain".to_string(),
+                    dupe_id: dupe_id.into(),
+                }
+            });
+
+            context.add_result(result).await?;
+        }
 
         Ok(())
     }
 
     /// Extracts the metadata from the message and emits it as processed output.
     ///
-    fn process_metadata(
+    async fn process_metadata(
         &self,
         message: &Message<'_>,
-        path: impl AsRef<path::Path>,
+        path: Option<impl AsRef<path::Path>>,
         dupe_id: impl Into<String>,
         context: &ProcessContext,
     ) -> anyhow::Result<()> {
-        let mut writer = File::create(&path)?;
-        let result = self.extract_metadata(message, &mut writer).map(|_| {
-            ProcessOutput {
-                path: path.as_ref().to_path_buf(),
-                output_type: ProcessOutputType::Processed,
-                mimetype: "application/json".to_string(),
-                dupe_id: dupe_id.into(),
-            }
-        });
-        context.add_result(result);
+        if let Some(path) = path {
+            let mut writer = File::create(&path)?;
+            let result = self.extract_metadata(message, &mut writer).map(|_| {
+                ProcessOutput {
+                    path: path.as_ref().to_path_buf(),
+                    output_type: ProcessOutputType::Processed,
+                    mimetype: "application/json".to_string(),
+                    dupe_id: dupe_id.into(),
+                }
+            });
+
+            context.add_result(result).await?;
+        }
 
         Ok(())
     }
 
     /// Renders a PDF from the message and emits it as processed output.
     ///
-    fn process_pdf(
+    async fn process_pdf(
         &self,
         message: &Message<'_>,
-        path: impl AsRef<path::Path>,
+        path: Option<impl AsRef<path::Path>>,
         dupe_id: impl Into<String>,
         context: &ProcessContext,
     ) -> anyhow::Result<()> {
-        let mut writer = File::create(&path)?;
-        let result = self.render_pdf(message, &mut writer).map(|_| {
-            ProcessOutput {
-                path: path.as_ref().to_path_buf(),
-                output_type: ProcessOutputType::Processed,
-                mimetype: "application/pdf".to_string(),
-                dupe_id: dupe_id.into(),
-            }
-        });
-        context.add_result(result);
+        if let Some(path) = path {
+            let mut writer = File::create(&path)?;
+            let result = self.render_pdf(message, &mut writer).map(|_| {
+                ProcessOutput {
+                    path: path.as_ref().to_path_buf(),
+                    output_type: ProcessOutputType::Processed,
+                    mimetype: "application/pdf".to_string(),
+                    dupe_id: dupe_id.into(),
+                }
+            });
+
+            context.add_result(result).await?;
+        }
 
         Ok(())
     }
 
     /// Discovers any attachments in the message and emits them as embedded output.
     ///
-    fn process_attachments(&self, message: &Message<'_>, context: &ProcessContext) -> anyhow::Result<()> {
+    async fn process_attachments(&self, message: &Message<'_>, context: &ProcessContext) -> anyhow::Result<()> {
         for part_id in &message.attachments {
             let part = message
                 .part(*part_id)
@@ -114,7 +132,6 @@ impl Rfc822Processor {
             let mimetype = mimetype(content_type);
             let Workspace { original_path, dupe_id, .. } = Workspace::new(
                 part.contents(),
-                &context.output_dir,
                 &mimetype,
                 &[]
             )?;
@@ -124,24 +141,23 @@ impl Rfc822Processor {
                 output_type: ProcessOutputType::Embedded,
                 mimetype,
                 dupe_id,
-            }));
+            })).await?;
         }
 
         Ok(())
     }
 }
 
+#[async_trait]
 impl Process for Rfc822Processor {
-    fn process(&self, mut content: Box<dyn Read + Send + Sync>, context: ProcessContext) {
+    async fn process(&self, mut content: impl Stream<Item=Bytes> + Send + Sync + Unpin, context: ProcessContext) -> anyhow::Result<()> {
         let mut raw: Vec<u8> = Vec::new();
-        content.read_to_end(&mut raw)
-            .map_err(|err| anyhow!("failed to read content: {}", err))
-            .and_then(|_| parse_message(&raw))
-            .and_then(|message| self.process(message, &context))
-            .unwrap_or_else(|err| context.add_result(Err(err)));
-    }
-}
+        StreamReader::new(Box::new(content)).read_to_end(&mut raw)?;
 
-fn parse_message(content: &[u8]) -> anyhow::Result<Message> {
-    MessageParser::default().parse(content).ok_or(anyhow!("failed to parse message"))
+        let parser = MessageParser::default();
+        let message = parser.parse(&raw).ok_or(anyhow!("failed to parse message"))?;
+        self.process(message, &context).await?;
+
+        Ok(())
+    }
 }

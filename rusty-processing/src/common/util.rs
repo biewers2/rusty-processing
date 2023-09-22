@@ -1,7 +1,10 @@
 use std::fs;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
+use std::ops::Deref;
 use std::path::PathBuf;
+use bytes::Bytes;
+use futures::{Stream, StreamExt};
 
 use mail_parser::ContentType;
 

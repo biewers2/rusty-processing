@@ -1,4 +1,8 @@
-use std::io::Read;
+use std::borrow::Cow;
+use async_trait::async_trait;
+use bytes::Bytes;
+
+use tokio_stream::Stream;
 
 use crate::processing::ProcessContext;
 
@@ -6,6 +10,7 @@ use crate::processing::ProcessContext;
 ///
 /// Process implementations are required to be thread safe.
 ///
+#[async_trait]
 pub trait Process: Send + Sync {
     /// Handle raw bytes.
     ///
@@ -14,5 +19,5 @@ pub trait Process: Send + Sync {
     /// * `content` - Async reader of the raw bytes to process.
     /// * `context` - The context for the processing operation.
     ///
-    fn process(&self, content: Box<dyn Read + Send + Sync>, context: ProcessContext);
+    async fn process(&self, content: impl Stream<Item=Bytes> + Send + Sync + Unpin, context: ProcessContext) -> anyhow::Result<()>;
 }

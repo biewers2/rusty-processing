@@ -1,4 +1,6 @@
+use std::fmt::Debug;
 use std::path;
+
 use serde::{Deserialize, Serialize};
 
 /// OutputInfo contains information about the output file.

@@ -1,9 +1,14 @@
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Write};
+use std::ops::Deref;
 
 use anyhow::anyhow;
+use async_trait::async_trait;
+use bytes::Bytes;
 use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
+use tokio_stream::Stream;
 
+use crate::common::StreamReader;
 use crate::common::workspace::Workspace;
 use crate::processing::{Process, ProcessContext, ProcessOutput, ProcessOutputType};
 
@@ -18,26 +23,34 @@ pub struct MboxProcessor;
 impl MboxProcessor {
     /// Processes messages from an iterator.
     ///
-    fn write_messages<T: Read>(&self, message_iter: MessageIterator<BufReader<T>>, context: ProcessContext) {
+    async fn write_messages<T: Read>(&self, message_iter: MessageIterator<BufReader<T>>, context: ProcessContext) -> anyhow::Result<()> {
+        println!("Writing messages");
+
         for message_res in message_iter {
             let message_res = message_res.map_err(|err| anyhow!("failed to parse message from mbox: {:?}", err));
             match message_res {
                 Ok(message) => {
-                    let result = self.write_message(message, &context);
-                    context.add_result(result);
+                    let result = self.write_message(message).await;
+
+                    println!("Sending...");
+                    context.add_result(result).await?;
+                    println!("Done sending...");
                 }
-                Err(e) => context.add_result(Err(e)),
+                Err(e) => context.add_result(Err(e)).await?,
             }
         }
+
+        Ok(())
     }
 
     /// Writes a message to the output directory.
     ///
-    fn write_message(&self, message: Message, context: &ProcessContext) -> anyhow::Result<ProcessOutput> {
+    async fn write_message(&self, message: Message) -> anyhow::Result<ProcessOutput> {
+        println!("Writing message");
+
         let mimetype = "message/rfc822";
         let Workspace { original_path, dupe_id, .. } = Workspace::new(
             message.contents(),
-            &context.output_dir,
             mimetype,
             &[],
         )?;
@@ -51,10 +64,12 @@ impl MboxProcessor {
     }
 }
 
+#[async_trait]
 impl Process for MboxProcessor {
-    fn process(&self, content: Box<dyn Read + Send + Sync>, context: ProcessContext) {
+    async fn process(&self, content: impl Stream<Item=Bytes> + Send + Sync + Unpin, context: ProcessContext) -> anyhow::Result<()> {
+        let content = StreamReader::new(Box::new(content));
         let reader = BufReader::new(content);
-        self.write_messages(MessageIterator::new(reader), context);
+        self.write_messages(MessageIterator::new(reader), context).await
     }
 }
 
@@ -67,9 +82,7 @@ mod tests {
     use super::*;
 
     fn processor_with_context() -> anyhow::Result<(MboxProcessor, ProcessContext, Receiver<anyhow::Result<ProcessOutput>>)> {
-        let output_dir = tempfile::tempdir()?.into_path();
         let (context, rx) = ProcessContext::new(
-            output_dir,
             "application/mbox",
             vec![],
         );
