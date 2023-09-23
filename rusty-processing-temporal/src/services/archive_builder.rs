@@ -2,11 +2,11 @@ use std::fs::File;
 use std::io::Seek;
 use std::path::Path;
 
-pub struct ZipBuilder {
+pub struct ArchiveBuilder {
     zipper: zip::ZipWriter<File>,
 }
 
-impl ZipBuilder {
+impl ArchiveBuilder {
     pub fn new() -> anyhow::Result<Self> {
         let file = tempfile::tempfile()?;
         let zipper = zip::ZipWriter::new(file);

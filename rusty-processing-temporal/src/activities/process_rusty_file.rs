@@ -1,5 +1,4 @@
 use std::fs::File;
-use std::os::unix::fs::MetadataExt;
 use std::path;
 use std::sync::{Arc, Mutex};
 
@@ -17,24 +16,43 @@ use rusty_processing::processing::{processor, ProcessOutput, ProcessOutputType, 
 
 use crate::io::download::download;
 use crate::io::upload::upload;
-use crate::services::ZipBuilder;
+use crate::services::ArchiveBuilder;
 use crate::util::{path_file_name_or_random, read_to_stream};
 
-#[derive(Deserialize, Debug)]
+/// Input to the `process_rusty_file` activity.
+///
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessRustyFileInput {
-    pub source_s3_uri: String,
-    pub output_s3_uri: String,
-    pub mimetype: String,
+    /// The S3 URI of the file to process.
+    ///
+    source_s3_uri: String,
+
+    /// The S3 URI of where to write the output archive to.
+    ///
+    output_s3_uri: String,
+
+    /// The MIME type of the file to process.
+    ///
+    mimetype: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+/// Struct to hold information about a failure (temporary).
+///
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TmpFailureOutput {
     message: String,
 }
 
+/// Output from the `process_rusty_file` activity.
+///
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProcessRustyFileOutput;
 
+/// Activity for processing a file.
+///
+/// This activity downloads a file from S3, processes it, and uploads the
+/// result back to S3 in the form of an archive.
+///
 pub async fn process_rusty_file_activity(
     _ctx: ActContext,
     input: ProcessRustyFileInput,
@@ -48,6 +66,22 @@ pub async fn process_rusty_file_activity(
     Ok(ProcessRustyFileOutput {})
 }
 
+/// Process a file.
+///
+/// This function downloads a file from S3, processes it, and uploads the
+/// result back to S3 in the form of an archive.
+///
+/// # Arguments
+///
+/// * `source_s3_uri` - The S3 URI of the file to process.
+/// * `output_s3_uri` - The S3 URI of where to write the output archive to.
+/// * `mimetype` - The MIME type of the file to process.
+///
+/// # Returns
+///
+/// * `Ok(())` - If the file was processed successfully.
+/// * `Err(_)` - If there was an error processing the file.
+///
 pub async fn process_rusty_file(
     source_s3_uri: String,
     output_s3_uri: String,
@@ -56,27 +90,32 @@ pub async fn process_rusty_file(
     let (dl_data_sink, source_stream) = tokio::sync::mpsc::channel(100);
     let source_stream = ReceiverStream::new(source_stream);
 
-    println!("Starting download");
     let dl_fut = tokio::spawn(
         download(source_s3_uri, dl_data_sink)
     );
 
-    println!("Starting processing/zipping");
-    let zip_builder = Arc::new(Mutex::new(ZipBuilder::new()?));
-    process_recursively(source_stream, mimetype, zip_builder.clone(), vec![]).await?;
+    let archive_builder = Arc::new(Mutex::new(ArchiveBuilder::new()?));
+    process_recursively(source_stream, mimetype, archive_builder.clone(), vec![]).await?;
     dl_fut.await??;
 
-    let zip_file = zip_builder.lock().unwrap().build()?;
-    println!("Zip file size: {}", zip_file.metadata()?.size());
-
-    upload(zip_file, output_s3_uri).await
+    let archive_file = archive_builder.lock().unwrap().build()?;
+    upload(archive_file, output_s3_uri).await
 }
 
+/// Process content recursively by processing newly discovered embedded content.
+///
+/// # Arguments
+///
+/// * `source_stream` - The stream of bytes to process.
+/// * `mimetype` - The MIME type of the content to process.
+/// * `archive_builder` - The builder for the output archive.
+/// * `embedded_dupe_chain` - The chain of dupe IDs for embedded content, used to structure the ZIP archive.
+///
 #[async_recursion]
 async fn process_recursively(
     source_stream: ReceiverStream<Bytes>,
     mimetype: String,
-    zip_builder: Arc<Mutex<ZipBuilder>>,
+    archive_builder: Arc<Mutex<ArchiveBuilder>>,
     embedded_dupe_chain: Vec<String>
 ) -> anyhow::Result<()> {
     let mut proc_futs = vec![];
@@ -97,19 +136,19 @@ async fn process_recursively(
 
                 match output.output_type {
                     ProcessOutputType::Processed => {
-                        let entry_path = zip_entry_path(&output.path, &dupe_chain);
-                        zip_builder.lock().unwrap().add_new(entry_path)?;
+                        let entry_path = build_archive_entry_path(&output.path, &dupe_chain);
+                        archive_builder.lock().unwrap().add_new(entry_path)?;
                     },
 
                     ProcessOutputType::Embedded => {
                         dupe_chain.push(output.dupe_id);
-                        let entry_path = zip_entry_path(&output.path, &dupe_chain);
+                        let entry_path = build_archive_entry_path(&output.path, &dupe_chain);
 
                         let (emb_sink, emb_stream) = tokio::sync::mpsc::channel(100);
                         let emb_stream = ReceiverStream::new(emb_stream);
 
                         proc_futs.push(tokio::spawn(
-                            process_recursively(emb_stream, output.mimetype, zip_builder.clone(), dupe_chain)
+                            process_recursively(emb_stream, output.mimetype, archive_builder.clone(), dupe_chain)
                         ));
 
                         let read_fut = tokio::spawn(async {
@@ -118,7 +157,7 @@ async fn process_recursively(
                             anyhow::Ok(())
                         });
 
-                        zip_builder.lock().unwrap().add_new(entry_path)?;
+                        archive_builder.lock().unwrap().add_new(entry_path)?;
                         read_fut.await??;
                     }
                 };
@@ -153,7 +192,7 @@ async fn process_stream(
     ).await
 }
 
-fn zip_entry_path(local_path: impl AsRef<path::Path>, embedded_dupe_chain: &[String]) -> path::PathBuf {
+fn build_archive_entry_path(local_path: impl AsRef<path::Path>, embedded_dupe_chain: &[String]) -> path::PathBuf {
     let mut path = path::PathBuf::new();
     for dupe_id in embedded_dupe_chain {
         path.push(dupe_id);
