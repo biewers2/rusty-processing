@@ -1,4 +1,4 @@
-use rusty_processing_temporal::activities::process_rusty_file::process_rusty_file;
+use rusty_processing_temporal::activities::process_rusty_file;
 
 const WORKER_BUILD_ID: &str = "rusty-mime-process-builder";
 const TASK_QUEUE: &str = "rusty-mime-process";

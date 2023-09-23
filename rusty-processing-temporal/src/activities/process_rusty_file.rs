@@ -14,8 +14,8 @@ use tokio_stream::wrappers::ReceiverStream;
 use rusty_processing::common::ByteStream;
 use rusty_processing::processing::{processor, ProcessOutput, ProcessOutputType, ProcessType};
 
-use crate::io::download::download;
-use crate::io::upload::upload;
+use crate::io::download;
+use crate::io::upload;
 use crate::services::ArchiveBuilder;
 use crate::util::{path_file_name_or_random, read_to_stream};
 

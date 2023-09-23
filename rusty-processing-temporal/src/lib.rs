@@ -4,27 +4,11 @@
 
 /// Temporal activity definitions.
 ///
-pub mod activities {
-    /// Activity for processing a Rusty file.
-    ///
-    pub mod process_rusty_file;
-}
+pub mod activities;
 
 /// I/O-related functionality.
 ///
-pub(crate) mod io {
-    /// Downloading a file from S3.
-    ///
-    pub mod download;
-
-    /// Uploading a file to S3.
-    ///
-    pub mod upload;
-
-    /// Uploader for uploading large files to S3 using multipart uploads.
-    ///
-    pub mod multipart_uploader;
-}
+pub(crate) mod io;
 
 /// Utility functionality.
 ///
