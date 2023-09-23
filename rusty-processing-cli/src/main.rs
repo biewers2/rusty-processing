@@ -1,6 +1,10 @@
+use std::fs::File;
 use std::path;
 
 use clap::Parser;
+use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
+use cli::read_to_stream;
 
 use rusty_processing::processing::{processor, ProcessType};
 
@@ -62,7 +66,8 @@ fn parse_directory_path(path_str: &str) -> Result<path::PathBuf, String> {
     }
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let types = if args.all {
         vec![ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf]
@@ -70,14 +75,29 @@ fn main() -> anyhow::Result<()> {
         args.types
     };
 
-    processor().process(
-        args.input,
-        args.output,
-        args.mimetype,
-        types,
-        &mut move |result| match result {
+    let (input_sink, input_stream) = tokio::sync::mpsc::channel(100);
+    let input_stream = Box::new(ReceiverStream::new(input_stream));
+    let file = File::open(&args.input)?;
+    read_to_stream(file, input_sink).await?;
+
+    let (output_sink, output_stream) = tokio::sync::mpsc::channel(100);
+    let mut output_stream = Box::new(ReceiverStream::new(output_stream));
+    tokio::spawn(
+        processor().process(
+            input_stream,
+            output_sink,
+            args.mimetype,
+            types,
+        )
+    );
+
+
+    while let Some(output) = output_stream.next().await {
+        match output {
             Ok(output) => println!("{:?}", output),
             Err(err) => println!("Error: {}", err),
-        },
-    )
+        }
+    }
+
+    Ok(())
 }
