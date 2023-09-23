@@ -75,7 +75,6 @@ impl MessageTransformer {
             HeaderValue::TextList(text_list) => self.visitor.on_header_text_list(name, text_list),
 
             HeaderValue::DateTime(date_time) => {
-                println!("{}", date_time);
                 self.visitor.on_header_date_time(name, date_time)
             }
 

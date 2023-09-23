@@ -1,13 +1,4 @@
-use std::str::FromStr;
-use std::sync::Arc;
-
-use temporal_sdk::{sdk_client_options, Worker};
-use temporal_sdk_core::{CoreRuntime, init_worker};
-use temporal_sdk_core_api::telemetry::TelemetryOptionsBuilder;
-use temporal_sdk_core_api::worker::WorkerConfigBuilder;
-use url::Url;
-
-use rusty_processing_temporal::activities::process_rusty_file::{process_rusty_file, process_rusty_file_activity};
+use rusty_processing_temporal::activities::process_rusty_file::process_rusty_file;
 
 const WORKER_BUILD_ID: &str = "rusty-mime-process-builder";
 const TASK_QUEUE: &str = "rusty-mime-process";
@@ -19,11 +10,11 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn start_worker() -> anyhow::Result<()> {
-    let s3_uri = "s3://mime-processing-test/ubuntu-no.mbox";
-    let output_s3_uri = "s3://mime-processing-test/ubuntu-no-small.mbox-output";
-    let mimetype = "application/mbox";
+    let s3_uri = "s3://mime-processing-test/ubuntu-no.mbox".to_string();
+    let output_s3_uri = format!("{}.zip", s3_uri);
+    let mimetype = "application/mbox".to_string();
 
-    let (results, failures) = process_rusty_file(&s3_uri, &output_s3_uri, mimetype).await?;
+    process_rusty_file(s3_uri, output_s3_uri, mimetype).await?;
     Ok(())
 
     // let server_options = sdk_client_options(Url::from_str("http://localhost:7233")?).build()?;

@@ -1,14 +1,11 @@
-use std::io::{BufReader, Read, Write};
-use std::ops::Deref;
+use std::io::{BufReader, Read};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
-use bytes::Bytes;
 use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
-use tokio_stream::Stream;
 
-use crate::common::StreamReader;
+use crate::common::{ByteStream, StreamReader};
 use crate::common::workspace::Workspace;
 use crate::processing::{Process, ProcessContext, ProcessOutput, ProcessOutputType};
 
@@ -24,30 +21,17 @@ impl MboxProcessor {
     /// Processes messages from an iterator.
     ///
     async fn write_messages<T: Read>(&self, message_iter: MessageIterator<BufReader<T>>, context: ProcessContext) -> anyhow::Result<()> {
-        println!("Writing messages");
-
         for message_res in message_iter {
-            let message_res = message_res.map_err(|err| anyhow!("failed to parse message from mbox: {:?}", err));
-            match message_res {
-                Ok(message) => {
-                    let result = self.write_message(message).await;
-
-                    println!("Sending...");
-                    context.add_result(result).await?;
-                    println!("Done sending...");
-                }
-                Err(e) => context.add_result(Err(e)).await?,
-            }
+            let message = message_res.map_err(|err| anyhow!("failed to parse message from mbox: {:?}", err))?;
+            let result = self.write_message(message).await;
+            context.add_result(result).await?;
         }
-
         Ok(())
     }
 
     /// Writes a message to the output directory.
     ///
     async fn write_message(&self, message: Message) -> anyhow::Result<ProcessOutput> {
-        println!("Writing message");
-
         let mimetype = "message/rfc822";
         let Workspace { original_path, dupe_id, .. } = Workspace::new(
             message.contents(),
@@ -66,7 +50,7 @@ impl MboxProcessor {
 
 #[async_trait]
 impl Process for MboxProcessor {
-    async fn process(&self, content: impl Stream<Item=Bytes> + Send + Sync + Unpin, context: ProcessContext) -> anyhow::Result<()> {
+    async fn process(&self, content: ByteStream, context: ProcessContext) -> anyhow::Result<()> {
         let content = StreamReader::new(Box::new(content));
         let reader = BufReader::new(content);
         self.write_messages(MessageIterator::new(reader), context).await
@@ -114,7 +98,7 @@ mod tests {
                 outputs.push(output?)
             }
 
-            // Sort to make the test deterministic
+            // Sort to make the services deterministic
             sort_embedded_outputs(&mut outputs);
             anyhow::Ok(outputs)
         })?;
@@ -150,7 +134,7 @@ mod tests {
                 outputs.push(output?)
             }
 
-            // Sort to make the test deterministic
+            // Sort to make the services deterministic
             sort_embedded_outputs(&mut outputs);
             anyhow::Ok(outputs)
         })?;

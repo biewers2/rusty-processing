@@ -1,8 +1,5 @@
-use std::borrow::Cow;
 use async_trait::async_trait;
-use bytes::Bytes;
-
-use tokio_stream::Stream;
+use crate::common::ByteStream;
 
 use crate::processing::ProcessContext;
 
@@ -19,5 +16,5 @@ pub trait Process: Send + Sync {
     /// * `content` - Async reader of the raw bytes to process.
     /// * `context` - The context for the processing operation.
     ///
-    async fn process(&self, content: impl Stream<Item=Bytes> + Send + Sync + Unpin, context: ProcessContext) -> anyhow::Result<()>;
+    async fn process(&self, content: ByteStream, context: ProcessContext) -> anyhow::Result<()>;
 }

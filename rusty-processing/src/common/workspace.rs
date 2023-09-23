@@ -1,8 +1,8 @@
 use std::path;
 
 use rusty_processing_identify::identifier::identifier;
+use crate::common::write_file;
 
-use crate::common::util;
 use crate::processing::ProcessType;
 
 /// A workspace defines a directory tree schematic.
@@ -49,7 +49,7 @@ impl Workspace {
         let entry_dir = output_dir.join(&dupe_id);
 
         let original_path = entry_dir.join("original");
-        util::write_file(&original_path, content)?;
+        write_file(&original_path, content)?;
 
         let text_path = types.contains(&ProcessType::Text)
             .then(|| entry_dir.join("extracted.txt"))

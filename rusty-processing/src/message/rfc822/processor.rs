@@ -1,17 +1,14 @@
-use std::path;
 use std::fs::File;
 use std::io::Read;
+use std::path;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{Stream, try_join};
-use futures::future::Fuse;
+use futures::try_join;
 use mail_parser::{Message, MessageParser, MimeHeaders};
 use serde::{Deserialize, Serialize};
-use crate::common::StreamReader;
 
-use crate::common::util::mimetype;
+use crate::common::{ByteStream, mimetype, StreamReader};
 use crate::common::workspace::Workspace;
 use crate::processing::{Process, ProcessContext, ProcessOutput, ProcessOutputType};
 
@@ -34,10 +31,6 @@ impl Rfc822Processor {
         let attach_fut = self.process_attachments(&message, context);
 
         try_join!(text_fut, meta_fut, pdf_fut, attach_fut)?;
-        Ok(())
-    }
-
-    async fn empty() -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -150,8 +143,8 @@ impl Rfc822Processor {
 
 #[async_trait]
 impl Process for Rfc822Processor {
-    async fn process(&self, mut content: impl Stream<Item=Bytes> + Send + Sync + Unpin, context: ProcessContext) -> anyhow::Result<()> {
-        let mut raw: Vec<u8> = Vec::new();
+    async fn process(&self, content: ByteStream, context: ProcessContext) -> anyhow::Result<()> {
+        let mut raw = Vec::new();
         StreamReader::new(Box::new(content)).read_to_end(&mut raw)?;
 
         let parser = MessageParser::default();

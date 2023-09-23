@@ -37,7 +37,7 @@ impl<S: Stream<Item=Bytes> + Send + Sync + Unpin> Read for StreamReader<S> {
                 // Refill buffer if empty
                 let bytes = match futures::executor::block_on(self.inner.next()) {
                     Some(bytes) => bytes,
-                    None => return Ok(0),
+                    None => break,
                 };
                 self.buffer = bytes.to_vec();
             } else {

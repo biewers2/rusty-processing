@@ -41,13 +41,6 @@ impl ProcessContext {
         (context, output_stream)
     }
 
-    pub fn with_mimetype(self, mimetype: impl Into<String>) -> Self {
-        Self {
-            mimetype: mimetype.into(),
-            ..self
-        }
-    }
-
     pub async fn add_result(&self, result: anyhow::Result<ProcessOutput>) -> anyhow::Result<()> {
         self.output_sink.send(result).await
             .map_err(|e| anyhow!(e))
