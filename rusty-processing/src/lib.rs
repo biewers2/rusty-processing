@@ -18,12 +18,14 @@ pub mod common;
 ///
 pub mod processing;
 
-pub(crate) mod message {
-    pub mod rfc822;
+pub(crate) mod application {
+    #[cfg(feature = "mail")]
+    pub mod mbox;
 }
 
-pub(crate) mod application {
-    pub mod mbox;
+#[cfg(feature = "mail")]
+pub(crate) mod message {
+    pub mod rfc822;
 }
 
 #[cfg(test)]

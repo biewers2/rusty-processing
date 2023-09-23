@@ -10,9 +10,9 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn start_worker() -> anyhow::Result<()> {
-    let s3_uri = "s3://mime-processing-test/ubuntu-no.mbox".to_string();
+    let s3_uri = "s3://mime-processing-test/ubuntu-no.mbox";
     let output_s3_uri = format!("{}.zip", s3_uri);
-    let mimetype = "application/mbox".to_string();
+    let mimetype = "application/mbox";
 
     process_rusty_file(s3_uri, output_s3_uri, mimetype).await?;
     Ok(())

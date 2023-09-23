@@ -5,9 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tokio::try_join;
 
-use crate::application::mbox::processor::MboxProcessor;
 use crate::common::ByteStream;
-use crate::message::rfc822::processor::Rfc822Processor;
 use crate::processing::{ProcessContext, ProcessType};
 use crate::processing::process::Process;
 use crate::processing::process_output::ProcessOutput;
@@ -88,8 +86,12 @@ impl Processor {
 
     fn processor(&self, mimetype: &str) -> anyhow::Result<Box<dyn Process>> {
         match mimetype {
-            "application/mbox" => Ok(Box::<MboxProcessor>::default()),
-            "message/rfc822" => Ok(Box::<Rfc822Processor>::default()),
+            #[cfg(feature = "mail")]
+            "application/mbox" => Ok(Box::<crate::application::mbox::MboxProcessor>::default()),
+
+            #[cfg(feature = "mail")]
+            "message/rfc822" => Ok(Box::<crate::message::rfc822::Rfc822Processor>::default()),
+
             _ => Err(anyhow!("Unsupported MIME type: {}", mimetype)),
         }
     }

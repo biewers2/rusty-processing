@@ -83,23 +83,23 @@ pub async fn process_rusty_file_activity(
 /// * `Err(_)` - If there was an error processing the file.
 ///
 pub async fn process_rusty_file(
-    source_s3_uri: String,
-    output_s3_uri: String,
-    mimetype: String,
+    source_s3_uri: impl Into<String>,
+    output_s3_uri: impl Into<String>,
+    mimetype: impl Into<String>,
 ) -> anyhow::Result<()> {
     let (dl_data_sink, source_stream) = tokio::sync::mpsc::channel(100);
     let source_stream = ReceiverStream::new(source_stream);
 
     let dl_fut = tokio::spawn(
-        download(source_s3_uri, dl_data_sink)
+        download(source_s3_uri.into(), dl_data_sink)
     );
 
     let archive_builder = Arc::new(Mutex::new(ArchiveBuilder::new()?));
-    process_recursively(source_stream, mimetype, archive_builder.clone(), vec![]).await?;
+    process_recursively(source_stream, mimetype.into(), archive_builder.clone(), vec![]).await?;
     dl_fut.await??;
 
     let archive_file = archive_builder.lock().unwrap().build()?;
-    upload(archive_file, output_s3_uri).await
+    upload(archive_file, output_s3_uri.into()).await
 }
 
 /// Process content recursively by processing newly discovered embedded content.

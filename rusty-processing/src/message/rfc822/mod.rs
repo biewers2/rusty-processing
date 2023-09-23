@@ -1,9 +1,11 @@
-pub mod html_message_visitor;
-pub mod message_formatter;
-pub mod message_visitor;
-pub mod processor;
-pub mod text_message_visitor;
-pub mod transformer;
+pub use processor::*;
+
+mod html_message_visitor;
+mod message_formatter;
+mod message_visitor;
+mod processor;
+mod text_message_visitor;
+mod transformer;
 
 mod text;
 mod metadata;
