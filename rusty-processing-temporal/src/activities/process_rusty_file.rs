@@ -1,20 +1,21 @@
-use std::fs::File;
 use std::path;
 use std::sync::{Arc, Mutex};
+use anyhow::anyhow;
 
 use async_recursion::async_recursion;
-use bytes::Bytes;
 use futures::future::try_join_all;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use temporal_sdk::ActContext;
+use tokio::fs::File;
 use tokio::sync::mpsc::Sender;
+use tokio::try_join;
 use tokio_stream::wrappers::ReceiverStream;
 
 use rusty_processing::common::ByteStream;
 use rusty_processing::processing::{processor, ProcessOutput, ProcessOutputType, ProcessType};
 
-use crate::io::download;
+use crate::io::S3GetObject;
 use crate::io::upload;
 use crate::services::ArchiveBuilder;
 use crate::util::{path_file_name_or_random, read_to_stream};
@@ -87,16 +88,12 @@ pub async fn process_rusty_file(
     output_s3_uri: impl Into<String>,
     mimetype: impl Into<String>,
 ) -> anyhow::Result<()> {
-    let (dl_data_sink, source_stream) = tokio::sync::mpsc::channel(100);
-    let source_stream = ReceiverStream::new(source_stream);
-
-    let dl_fut = tokio::spawn(
-        download(source_s3_uri.into(), dl_data_sink)
-    );
+    let get_object = Box::new(S3GetObject::new(source_s3_uri.into())?);
+    let (stream, get_object_fut) = read_to_stream(get_object.body).await?;
 
     let archive_builder = Arc::new(Mutex::new(ArchiveBuilder::new()?));
-    process_recursively(source_stream, mimetype.into(), archive_builder.clone(), vec![]).await?;
-    dl_fut.await??;
+    process_recursively(stream, mimetype.into(), archive_builder.clone(), vec![]).await?;
+    get_object_fut.await??;
 
     let archive_file = archive_builder.lock().unwrap().build()?;
     upload(archive_file, output_s3_uri.into()).await
@@ -113,7 +110,7 @@ pub async fn process_rusty_file(
 ///
 #[async_recursion]
 async fn process_recursively(
-    source_stream: ReceiverStream<Bytes>,
+    source_stream: ByteStream,
     mimetype: String,
     archive_builder: Arc<Mutex<ArchiveBuilder>>,
     embedded_dupe_chain: Vec<String>
@@ -123,9 +120,9 @@ async fn process_recursively(
 
     // Begin processing data
     let (process_output_sink, process_output_stream) = tokio::sync::mpsc::channel(100);
-    let mut process_output_stream = ReceiverStream::new(process_output_stream);
+    let mut process_output_stream = Box::new(ReceiverStream::new(process_output_stream));
     proc_futs.push(tokio::spawn(
-        process_stream(Box::new(source_stream), process_output_sink, mimetype)
+        process_stream(source_stream, process_output_sink, mimetype)
     ));
 
     // Begin receiving data
@@ -133,6 +130,7 @@ async fn process_recursively(
         match output {
             Ok(output) => {
                 let mut dupe_chain = embedded_dupe_chain.clone();
+                println!("Processing output: {:?}", output);
 
                 match output.output_type {
                     ProcessOutputType::Processed => {
@@ -144,21 +142,23 @@ async fn process_recursively(
                         dupe_chain.push(output.dupe_id);
                         let entry_path = build_archive_entry_path(&output.path, &dupe_chain);
 
-                        let (emb_sink, emb_stream) = tokio::sync::mpsc::channel(100);
-                        let emb_stream = ReceiverStream::new(emb_stream);
+                        let recursive_archive_builder = archive_builder.clone();
+                        let file = Box::new(File::open(&output.path).await?);
+                        proc_futs.push(tokio::spawn(async move {
+                            let (emb_stream, emb_read_fut) = read_to_stream(file).await?;
+                            let proc_fut = tokio::spawn(process_recursively(
+                                emb_stream,
+                                output.mimetype,
+                                recursive_archive_builder,
+                                dupe_chain
+                            ));
 
-                        proc_futs.push(tokio::spawn(
-                            process_recursively(emb_stream, output.mimetype, archive_builder.clone(), dupe_chain)
-                        ));
-
-                        let read_fut = tokio::spawn(async {
-                            let file = File::open(output.path)?;
-                            read_to_stream(file, emb_sink).await?;
-                            anyhow::Ok(())
-                        });
+                            emb_read_fut.await??;
+                            proc_fut.await??;
+                            Ok(())
+                        }));
 
                         archive_builder.lock().unwrap().add_new(entry_path)?;
-                        read_fut.await??;
                     }
                 };
             },
@@ -166,8 +166,8 @@ async fn process_recursively(
         }
     }
 
-    for result in try_join_all(proc_futs).await? {
-        if let Err(e) = result {
+    for fut in proc_futs {
+        if let Err(e) = fut.await? {
             failures.push(e);
         }
     }

@@ -1,10 +1,10 @@
-pub use download::*;
+pub use s3_get_object::*;
 pub use upload::*;
 pub use multipart_uploader::*;
 
 /// Downloading a file from S3.
 ///
-mod download;
+mod s3_get_object;
 
 /// Uploading a file to S3.
 ///
