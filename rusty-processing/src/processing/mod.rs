@@ -1,14 +1,13 @@
 mod processor;
-mod process_context;
-mod process_output;
 mod process;
 
+use std::path;
 use std::str::FromStr;
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc::Sender;
 
 pub use self::processor::*;
-pub use self::process_output::*;
-pub(crate) use self::process_context::*;
 pub(crate) use self::process::*;
 
 /// The type of output to produce from processing.
@@ -38,5 +37,214 @@ impl FromStr for ProcessType {
             "pdf" => Ok(ProcessType::Pdf),
             _ => Err(format!("Can not convert {} to OutputType", s)),
         }
+    }
+}
+
+/// Represents the state of a processing operation.
+///
+#[derive(Debug, Clone)]
+pub struct ProcessState {
+    /// The chain of IDs representing a unique identifying path to the current file being processed.
+    ///
+    /// For an overall processing operation, this is useful for defining the structure of embedded and processed files stemming from
+    /// a root file. This structure is a tree, where the embedded files are branches and the processed files are leaves.
+    ///
+    pub id_chain: Vec<String>,
+}
+
+/// Structure defining the context for a processing operation.
+///
+#[derive(Debug, Clone)]
+pub struct ProcessContext {
+    /// The MIME type of the file to process.
+    ///
+    pub mimetype: String,
+
+    /// The types of output to generate.
+    ///
+    pub types: Vec<ProcessType>,
+
+    /// The state of the processing operation.
+    ///
+    pub state: ProcessState,
+
+    output_sink: Sender<anyhow::Result<ProcessOutput>>,
+}
+
+impl ProcessContext {
+    /// Creates a new ProcessContext with the given MIME type.
+    ///
+    /// Clones all other fields from the current ProcessContext.
+    ///
+    pub fn new_clone(&self, mimetype: String) -> Self {
+        Self {
+            mimetype,
+            types: self.types.clone(),
+            output_sink: self.output_sink.clone(),
+            state: self.state.clone(),
+        }
+    }
+
+    /// Adds an output to be sent through the output transfer channel created by the caller of the processing operation.
+    ///
+    pub async fn add_output(&self, result: anyhow::Result<ProcessOutput>) -> anyhow::Result<()> {
+        self.output_sink.send(result).await
+            .map_err(|e| anyhow!(e))
+    }
+
+    /// Returns the current ID chain.
+    ///
+    /// See `ProcessState.id_chain` for more information.
+    ///
+    pub fn id_chain(self) -> Vec<String> {
+        self.state.id_chain
+    }
+}
+
+/// Builder for ProcessContext.
+///
+#[derive(Debug, Clone)]
+pub struct ProcessContextBuilder {
+    mimetype: String,
+    types: Vec<ProcessType>,
+    output_sink: Sender<anyhow::Result<ProcessOutput>>,
+    state: ProcessState,
+}
+
+impl ProcessContextBuilder {
+    /// Creates a new ProcessContextBuilder with the given MIME type, types of files to process, and output transfer channel.
+    ///
+    /// # Arguments
+    ///
+    /// * `mimetype` - The MIME type of the file to process.
+    /// * `types` - The types of output to generate.
+    /// * `output_sink` - The output transfer channel created by the caller of the processing operation.
+    ///
+    pub fn new(
+        mimetype: impl Into<String>,
+        types: Vec<ProcessType>,
+        output_sink: Sender<anyhow::Result<ProcessOutput>>,
+    ) -> Self {
+        ProcessContextBuilder {
+            mimetype: mimetype.into(),
+            types,
+            output_sink,
+            state: ProcessState {
+                id_chain: Vec::new(),
+            }
+        }
+    }
+
+    /// Set the MIME type to use.
+    ///
+    pub fn mimetype(mut self, mimetype: impl Into<String>) -> Self {
+        self.mimetype = mimetype.into();
+        self
+    }
+
+    /// Set the types of output to generate.
+    ///
+    pub fn types(mut self, types: Vec<ProcessType>) -> Self {
+        self.types = types;
+        self
+    }
+
+    /// Build the ProcessContext.
+    ///
+    pub fn build(self) -> ProcessContext {
+        ProcessContext {
+            mimetype: self.mimetype,
+            types: self.types,
+            output_sink: self.output_sink,
+            state: self.state,
+        }
+    }
+}
+
+impl From<ProcessContext> for ProcessContextBuilder {
+    fn from(context: ProcessContext) -> Self {
+        ProcessContextBuilder {
+            mimetype: context.mimetype,
+            types: context.types,
+            output_sink: context.output_sink,
+            state: context.state,
+        }
+    }
+}
+
+/// Output is the result of processing a file.
+///
+/// It can be either a new file or an embedded file.
+///
+#[derive(Debug, Clone)]
+pub enum ProcessOutput {
+    /// A newly created file as a result of processing the original file.
+    ///
+    Processed(ProcessState, ProcessOutputContext),
+
+    /// A file discovered during the processing of the original file.
+    ///
+    Embedded(ProcessState, ProcessOutputContext, Sender<anyhow::Result<ProcessOutput>>),
+}
+
+/// OutputInfo contains information about the output file.
+///
+/// It contains the path, mimetype and dupe_id.
+///
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+pub struct ProcessOutputContext {
+    /// Path to the output file.
+    ///
+    pub path: path::PathBuf,
+
+    /// Mimetype of the output file.
+    ///
+    pub mimetype: String,
+
+    /// Dupe ID of the output file.
+    ///
+    pub dupe_id: String,
+}
+
+impl ProcessOutput {
+    /// Creates a new ProcessOutput representing a newly created file.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The ProcessContext of the processing operation.
+    /// * `path` - The path to the output file.
+    /// * `mimetype` - The MIME type of the output file.
+    /// * `dupe_id` - The dupe ID of the output file.
+    ///
+    pub fn processed(ctx: &ProcessContext, path: path::PathBuf, mimetype: String, dupe_id: String) -> Self {
+        Self::Processed(
+            ctx.state.clone(),
+            ProcessOutputContext {
+                path,
+                mimetype,
+                dupe_id,
+            }
+        )
+    }
+
+    /// Creates a new ProcessOutput representing an embedded file.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The ProcessContext of the processing operation.
+    /// * `path` - The path to the output file.
+    /// * `mimetype` - The MIME type of the output file.
+    /// * `dupe_id` - The dupe ID of the output file.
+    ///
+    pub fn embedded(ctx: &ProcessContext, path: path::PathBuf, mimetype: String, dupe_id: String) -> Self {
+        Self::Embedded(
+            ctx.state.clone(),
+            ProcessOutputContext {
+                path,
+                mimetype,
+                dupe_id,
+            },
+            ctx.output_sink.clone(),
+        )
     }
 }

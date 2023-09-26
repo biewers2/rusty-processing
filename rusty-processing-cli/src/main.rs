@@ -6,7 +6,7 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
 use cli::read_to_stream;
 
-use rusty_processing::processing::{processor, ProcessType};
+use rusty_processing::processing::{ProcessContextBuilder, processor, ProcessType};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -82,12 +82,17 @@ async fn main() -> anyhow::Result<()> {
 
     let (output_sink, output_stream) = tokio::sync::mpsc::channel(100);
     let mut output_stream = Box::new(ReceiverStream::new(output_stream));
+
+    let ctx = ProcessContextBuilder::new(
+        args.mimetype,
+        types,
+        output_sink
+    ).build();
+
     tokio::spawn(
         processor().process(
+            ctx,
             input_stream,
-            output_sink,
-            args.mimetype,
-            types,
         )
     );
 

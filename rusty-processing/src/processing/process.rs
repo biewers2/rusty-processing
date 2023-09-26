@@ -16,5 +16,5 @@ pub trait Process: Send + Sync {
     /// * `content` - Async reader of the raw bytes to process.
     /// * `context` - The context for the processing operation.
     ///
-    async fn process(&self, content: ByteStream, context: ProcessContext) -> anyhow::Result<()>;
+    async fn process(&self, ctx: ProcessContext, content: ByteStream) -> anyhow::Result<()>;
 }

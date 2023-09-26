@@ -1,16 +1,11 @@
-use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
 use futures::executor::block_on;
-use tokio::io::{AsyncRead, ReadBuf};
+use tokio::io::AsyncRead;
 
 use crate::services::s3_client;
 use crate::util::parse_s3_uri;
 
 pub struct S3GetObject {
     pub body: Box<dyn AsyncRead + Send + Unpin>,
-    buffer: Vec<u8>,
 }
 
 impl S3GetObject {
@@ -25,9 +20,6 @@ impl S3GetObject {
                 .await
         })?;
 
-        Ok(Self {
-            body: Box::new(object.body.into_async_read()),
-            buffer: vec![],
-        })
+        Ok(Self { body: Box::new(object.body.into_async_read()) })
     }
 }

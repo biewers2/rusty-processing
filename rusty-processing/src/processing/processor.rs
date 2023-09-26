@@ -1,14 +1,10 @@
 use anyhow::anyhow;
-use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::Sender;
-use tokio::try_join;
 
 use crate::common::ByteStream;
-use crate::processing::{ProcessContext, ProcessType};
+use crate::processing::ProcessContext;
 use crate::processing::process::Process;
-use crate::processing::process_output::ProcessOutput;
 
 lazy_static! {
     static ref PROCESSOR: Processor = Processor;
@@ -45,43 +41,10 @@ impl Processor {
     ///
     pub async fn process(
         &self,
-        source_stream: ByteStream,
-        output_sink: Sender<anyhow::Result<ProcessOutput>>,
-        mimetype: String,
-        types: Vec<ProcessType>,
+        ctx: ProcessContext,
+        stream: ByteStream,
     ) -> anyhow::Result<()> {
-        let (context, output_stream) = ProcessContext::new(
-            mimetype,
-            types,
-        );
-
-        let process_fut = self.process_mimetype(source_stream, context);
-        let transfer_fut = self.transfer_output(output_stream, output_sink);
-
-        try_join!(process_fut, transfer_fut)?;
-        Ok(())
-    }
-
-    async fn process_mimetype(
-        &self,
-        source_stream: ByteStream,
-        context: ProcessContext,
-    ) -> anyhow::Result<()> {
-        let mimetype = context.mimetype.as_ref();
-        self.processor(mimetype)?.process(source_stream, context).await
-    }
-
-    async fn transfer_output<'a>(
-        &self,
-        mut stream: impl Stream<Item=anyhow::Result<ProcessOutput>> + Send + Sync + Unpin,
-        sink: Sender<anyhow::Result<ProcessOutput>>,
-    ) -> anyhow::Result<()> {
-        while let Some(output) = stream.next().await {
-            sink.send(output).await
-                .map_err(|e| anyhow!(e.to_string()))?;
-        }
-
-        Ok(())
+        self.processor(&ctx.mimetype)?.process(ctx, stream).await
     }
 
     fn processor(&self, mimetype: &str) -> anyhow::Result<Box<dyn Process>> {

@@ -1,7 +1,6 @@
-use std::io::Read;
-
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 use crate::services::s3_client;
 use crate::util::parse_s3_uri;
@@ -17,7 +16,7 @@ impl MultipartUploader {
         Ok(Self { bucket, key })
     }
 
-    pub async fn upload(&self, reader: &mut dyn Read) -> anyhow::Result<()> {
+    pub async fn upload(&self, reader: &mut (dyn AsyncRead + Unpin)) -> anyhow::Result<()> {
         let multipart_upload = s3_client()
             .await
             .create_multipart_upload()
@@ -37,13 +36,13 @@ impl MultipartUploader {
     async fn upload_parts(
         &self,
         upload_id: &dyn AsRef<str>,
-        reader: &mut dyn Read,
+        reader: &mut (dyn AsyncRead + Unpin),
     ) -> anyhow::Result<Vec<CompletedPart>> {
         let mut parts = vec![];
         let mut buf = [0_u8; 1024];
         let mut part_num = 1_i32;
 
-        while let Ok(bytes_read) = reader.read(&mut buf) {
+        while let Ok(bytes_read) = reader.read(&mut buf).await {
             if bytes_read == 0 {
                 break;
             }

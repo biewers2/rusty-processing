@@ -1,10 +1,8 @@
-use std::ops::{Deref, DerefMut};
+use std::future::Future;
 use std::path;
-use byte_unit::ByteUnit::MB;
 
 use bytes::Bytes;
 use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio::task::JoinHandle;
 use tokio_stream::wrappers::ReceiverStream;
 
 pub use parse_s3_uri::*;
@@ -12,11 +10,11 @@ use rusty_processing::common::ByteStream;
 
 mod parse_s3_uri;
 
-pub async fn read_to_stream(mut source: Box<dyn AsyncRead + Send + Unpin>) -> anyhow::Result<(ByteStream, JoinHandle<anyhow::Result<()>>)> {
-    let (sink, stream) = tokio::sync::mpsc::channel(1000);
+pub fn read_to_stream(mut source: Box<dyn AsyncRead + Send + Unpin>) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)> {
+    let (sink, stream) = tokio::sync::mpsc::channel(100);
 
-    let read_fut = tokio::spawn(async move {
-        let mut buf = vec![0; 100000];
+    let read_fut = async move {
+        let mut buf = vec![0; 1024 * 1024];
 
         loop {
             let bytes_read = source.read(&mut buf).await?;
@@ -29,7 +27,7 @@ pub async fn read_to_stream(mut source: Box<dyn AsyncRead + Send + Unpin>) -> an
         }
 
         Ok(())
-    });
+    };
 
     let stream = Box::new(ReceiverStream::new(stream));
     Ok((stream, read_fut))

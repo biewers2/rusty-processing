@@ -25,6 +25,7 @@ async_once = "~0.2.6"
 filesize = "~0.2.0"
 byte-unit = "~4.0.19"
 uuid = { version = "1.4.1", features = ["v4"] }
+threadpool = "1.8.1"
 
 [dependencies.rusty-processing]
 version = "0.1.0"

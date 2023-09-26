@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::{ByteStream, StreamReader};
 use crate::common::workspace::Workspace;
-use crate::processing::{Process, ProcessContext, ProcessOutput, ProcessOutputType};
+use crate::processing::{Process, ProcessContext, ProcessOutput};
 
 /// MboxProcessor is responsible for processing mbox files.
 ///
@@ -20,18 +20,18 @@ pub struct MboxProcessor;
 impl MboxProcessor {
     /// Processes messages from an iterator.
     ///
-    async fn write_messages<T: Read>(&self, message_iter: MessageIterator<BufReader<T>>, context: ProcessContext) -> anyhow::Result<()> {
+    async fn write_messages<T: Read>(&self, ctx: ProcessContext, message_iter: MessageIterator<BufReader<T>>) -> anyhow::Result<()> {
         for message_res in message_iter {
             let message = message_res.map_err(|err| anyhow!("failed to parse message from mbox: {:?}", err))?;
-            let result = self.write_message(message).await;
-            context.add_result(result).await?;
+            let result = self.write_message(&ctx, message).await;
+            ctx.add_output(result).await?;
         }
         Ok(())
     }
 
     /// Writes a message to the output directory.
     ///
-    async fn write_message(&self, message: Message) -> anyhow::Result<ProcessOutput> {
+    async fn write_message(&self, ctx: &ProcessContext, message: Message) -> anyhow::Result<ProcessOutput> {
         let mimetype = "message/rfc822";
         let Workspace { original_path, dupe_id, .. } = Workspace::new(
             message.contents(),
@@ -39,21 +39,18 @@ impl MboxProcessor {
             &[],
         )?;
 
-        Ok(ProcessOutput {
-            path: original_path,
-            output_type: ProcessOutputType::Embedded,
-            mimetype: mimetype.to_string(),
-            dupe_id,
-        })
+        let ctx = ctx.new_clone(mimetype.to_string());
+
+        Ok(ProcessOutput::embedded(&ctx, original_path, mimetype.to_string(), dupe_id))
     }
 }
 
 #[async_trait]
 impl Process for MboxProcessor {
-    async fn process(&self, content: ByteStream, context: ProcessContext) -> anyhow::Result<()> {
+    async fn process(&self, ctx: ProcessContext, content: ByteStream) -> anyhow::Result<()> {
         let content = StreamReader::new(Box::new(content));
         let reader = BufReader::new(content);
-        self.write_messages(MessageIterator::new(reader), context).await
+        self.write_messages(ctx, MessageIterator::new(reader)).await
     }
 }
 
@@ -65,7 +62,7 @@ mod tests {
 
     use super::*;
 
-    fn processor_with_context() -> anyhow::Result<(MboxProcessor, ProcessContext, Receiver<anyhow::Result<ProcessOutput>>)> {
+    fn processor_with_context() -> anyhow::Result<(MboxProcessor, ProcessContext, Receiver<anyhow::Result<ProcessOutputContext>>)> {
         let (context, rx) = ProcessContext::new(
             "application/mbox",
             vec![],
@@ -73,10 +70,10 @@ mod tests {
         Ok((MboxProcessor::default(), context, rx))
     }
 
-    fn sort_embedded_outputs(outputs: &mut Vec<ProcessOutput>) {
+    fn sort_embedded_outputs(outputs: &mut Vec<ProcessOutputContext>) {
         outputs.sort_by(|a, b| {
             match (&a.output_type, &b.output_type) {
-                (ProcessOutputType::Embedded, ProcessOutputType::Embedded) => a.dupe_id.cmp(&b.dupe_id),
+                (ProcessOutputForm::Embedded, ProcessOutputForm::Embedded) => a.dupe_id.cmp(&b.dupe_id),
                 _ => panic!("expected embedded output"),
             }
         });
@@ -106,12 +103,12 @@ mod tests {
         assert_eq!(outputs.len(), 2);
 
         let output = & outputs[0];
-        assert_eq!(output.output_type, ProcessOutputType::Embedded);
+        assert_eq!(output.output_type, ProcessOutputForm::Embedded);
         assert_eq!(output.mimetype, "message/rfc822");
         assert_eq!(output.dupe_id, "4d338bc9f95d450a9372caa2fe0dfc97");
 
         let output = & outputs[1];
-        assert_eq!(output.output_type, ProcessOutputType::Embedded);
+        assert_eq!(output.output_type, ProcessOutputForm::Embedded);
         assert_eq!(output.mimetype, "message/rfc822");
         assert_eq!(output.dupe_id, "5e574a8f0d36b8805722b4e5ef3b7fd9");
 
@@ -141,7 +138,7 @@ mod tests {
 
         assert_eq!(outputs.len(), 344);
         for output in outputs {
-            assert_eq!(output.output_type, ProcessOutputType::Embedded);
+            assert_eq!(output.output_type, ProcessOutputForm::Embedded);
             assert_eq!(output.mimetype, "message/rfc822");
         }
 
