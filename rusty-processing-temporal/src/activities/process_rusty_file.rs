@@ -116,10 +116,13 @@ async fn process_rusty_stream(
         while let Some(output) = output_rx.recv().await {
             match output {
                 Ok(output) => {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()?;
+
                     let archive_path_sink = archive_path_sink.clone();
 
-                    pool.execute(move || rt.block_on(async move {
+                    pool.execute(move || rt.block_on(async {
                         match handle_process_output(output).await {
                             Ok(path) => {
                                 println!("Adding to archive: {:?}", path);
@@ -154,22 +157,22 @@ async fn process_rusty_stream(
 
 async fn handle_process_output(output: ProcessOutput) -> anyhow::Result<path::PathBuf> {
     match output {
-        ProcessOutput::Processed(state, output_ctx) => {
-            Ok(build_archive_entry_path(output_ctx.path, &state.id_chain))
-        },
+        ProcessOutput::Processed(state, data) => {
+            Ok(build_archive_entry_path(data.path, &state.id_chain))
+        }
 
-        ProcessOutput::Embedded(state, output_ctx, output_sink) => {
+        ProcessOutput::Embedded(state, data, output_sink) => {
             let mut id_chain = state.id_chain;
-            id_chain.push(output_ctx.dupe_id);
-            let entry_path = build_archive_entry_path(&output_ctx.path, &id_chain);
+            id_chain.push(data.dupe_id);
+            let entry_path = build_archive_entry_path(&data.path, &id_chain);
 
             let ctx = ProcessContextBuilder::new(
-                output_ctx.mimetype,
+                data.mimetype,
                 PROCESS_TYPES.to_vec(),
                 output_sink
             ).build();
 
-            let file = Box::new(File::open(&output_ctx.path).await?);
+            let file = Box::new(File::open(&data.path).await?);
             let (emb_stream, emb_read_fut) = read_to_stream(file)?;
             let emb_read_fut = tokio::spawn(emb_read_fut);
 
@@ -187,8 +190,6 @@ fn build_archive_entry_path(local_path: impl AsRef<path::Path>, embedded_dupe_ch
     for dupe_id in embedded_dupe_chain {
         path.push(dupe_id);
     }
-
-    let name = path_file_name_or_random(local_path);
-    path.push(name);
+    path.push(path_file_name_or_random(local_path));
     path
 }

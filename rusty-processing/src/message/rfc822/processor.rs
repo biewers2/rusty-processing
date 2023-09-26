@@ -8,8 +8,9 @@ use futures::try_join;
 use mail_parser::{Message, MessageParser, MimeHeaders};
 use serde::{Deserialize, Serialize};
 
-use crate::common::{ByteStream, mimetype, StreamReader};
+use crate::common::{ByteStream, StreamReader};
 use crate::common::workspace::Workspace;
+use crate::message::rfc822::mimetype;
 use crate::processing::{Process, ProcessContext, ProcessOutput};
 
 #[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]

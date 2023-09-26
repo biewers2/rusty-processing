@@ -42,7 +42,9 @@ impl FromStr for ProcessType {
 
 /// Represents the state of a processing operation.
 ///
-#[derive(Debug, Clone)]
+/// This is built and modified during processing and is provided with the final processing output.
+///
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub struct ProcessState {
     /// The chain of IDs representing a unique identifying path to the current file being processed.
     ///
@@ -52,7 +54,10 @@ pub struct ProcessState {
     pub id_chain: Vec<String>,
 }
 
-/// Structure defining the context for a processing operation.
+/// Defines the context for a processing operation.
+///
+/// This is passed to the root processing function and is used to provide information about the current file being processed,
+/// as well as any additional parameters or information that the processing operation may use through its lifetime, such as the `types`.
 ///
 #[derive(Debug, Clone)]
 pub struct ProcessContext {
@@ -172,7 +177,7 @@ impl From<ProcessContext> for ProcessContextBuilder {
     }
 }
 
-/// Output is the result of processing a file.
+/// Representation of the output of processing a file.
 ///
 /// It can be either a new file or an embedded file.
 ///
@@ -180,19 +185,19 @@ impl From<ProcessContext> for ProcessContextBuilder {
 pub enum ProcessOutput {
     /// A newly created file as a result of processing the original file.
     ///
-    Processed(ProcessState, ProcessOutputContext),
+    Processed(ProcessState, ProcessOutputData),
 
     /// A file discovered during the processing of the original file.
     ///
-    Embedded(ProcessState, ProcessOutputContext, Sender<anyhow::Result<ProcessOutput>>),
+    Embedded(ProcessState, ProcessOutputData, Sender<anyhow::Result<ProcessOutput>>),
 }
 
-/// OutputInfo contains information about the output file.
+/// Data associated with the file created.
 ///
-/// It contains the path, mimetype and dupe_id.
+/// It contains the path, mimetype and the deduplication identifier.
 ///
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
-pub struct ProcessOutputContext {
+pub struct ProcessOutputData {
     /// Path to the output file.
     ///
     pub path: path::PathBuf,
@@ -219,7 +224,7 @@ impl ProcessOutput {
     pub fn processed(ctx: &ProcessContext, path: path::PathBuf, mimetype: String, dupe_id: String) -> Self {
         Self::Processed(
             ctx.state.clone(),
-            ProcessOutputContext {
+            ProcessOutputData {
                 path,
                 mimetype,
                 dupe_id,
@@ -239,7 +244,7 @@ impl ProcessOutput {
     pub fn embedded(ctx: &ProcessContext, path: path::PathBuf, mimetype: String, dupe_id: String) -> Self {
         Self::Embedded(
             ctx.state.clone(),
-            ProcessOutputContext {
+            ProcessOutputData {
                 path,
                 mimetype,
                 dupe_id,

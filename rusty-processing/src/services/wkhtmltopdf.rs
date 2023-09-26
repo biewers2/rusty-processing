@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn check_wkhtmltopdf_installed() -> anyhow::Result<()> {
         let mut proc = Command::new("which")
-            .args(&["wkhtmltopdf"])
+            .args(["wkhtmltopdf"])
             .stdout(Stdio::piped())
             .spawn()?;
 

@@ -1,7 +1,7 @@
 use std::path;
 
 use rusty_processing_identify::identifier::identifier;
-use crate::common::write_file;
+use crate::common::write_to_file;
 
 use crate::processing::ProcessType;
 
@@ -49,7 +49,7 @@ impl Workspace {
         let entry_dir = output_dir.join(&dupe_id);
 
         let original_path = entry_dir.join("original");
-        write_file(&original_path, content)?;
+        write_to_file(content, &original_path)?;
 
         let text_path = types.contains(&ProcessType::Text)
             .then(|| entry_dir.join("extracted.txt"))
@@ -74,26 +74,22 @@ impl Workspace {
 
 #[cfg(test)]
 mod test {
-    use lazy_static::lazy_static;
     use super::*;
 
     #[test]
     fn test_workspace_no_types() -> anyhow::Result<()> {
-        let output_dir = tempfile::tempdir()?.into_path();
         let mimetype = "text/plain".to_string();
         let dupe_id = "3adbbad1791fbae3ec908894c4963870";
-        let dir = output_dir.join(dupe_id);
 
         let workspace = Workspace::new(
             b"hello, world!",
-            &output_dir,
             mimetype,
             &[],
         )?;
 
+        let base = path::PathBuf::from(dupe_id);
         assert_eq!(workspace.dupe_id, dupe_id);
-        assert_eq!(workspace.entry_dir, dir);
-        assert_eq!(workspace.original_path, dir.join("original"));
+        assert!(workspace.original_path.ends_with(base.join("original")));
         assert_eq!(workspace.text_path, None);
         assert_eq!(workspace.metadata_path, None);
         assert_eq!(workspace.pdf_path, None);
@@ -103,25 +99,22 @@ mod test {
 
     #[test]
     fn test_workspace_all_types() -> anyhow::Result<()> {
-        let output_dir = tempfile::tempdir()?.into_path();
-        let mimetype = "text/plain".to_string();
+        let mimetype = "text/plain";
         let types = vec![ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf];
         let dupe_id = "3adbbad1791fbae3ec908894c4963870";
-        let dir = output_dir.join(dupe_id);
 
         let workspace = Workspace::new(
             b"hello, world!",
-            &output_dir,
-            &mimetype,
+            mimetype,
             &types,
         )?;
 
+        let base = path::PathBuf::from(dupe_id);
         assert_eq!(workspace.dupe_id, dupe_id);
-        assert_eq!(workspace.entry_dir, dir);
-        assert_eq!(workspace.original_path, dir.join("original"));
-        assert_eq!(workspace.text_path, Some(dir.join("extracted.txt")));
-        assert_eq!(workspace.metadata_path, Some(dir.join("metadata.json")));
-        assert_eq!(workspace.pdf_path, Some(dir.join("rendered.pdf")));
+        assert!(workspace.original_path.ends_with(base.join("original")));
+        assert!(workspace.text_path.unwrap().ends_with(base.join("extracted.txt")));
+        assert!(workspace.metadata_path.unwrap().ends_with(base.join("metadata.json")));
+        assert!(workspace.pdf_path.unwrap().ends_with(base.join("rendered.pdf")));
         Ok(())
     }
 }

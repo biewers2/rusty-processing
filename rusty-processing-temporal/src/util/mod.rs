@@ -10,7 +10,7 @@ use rusty_processing::common::ByteStream;
 
 mod parse_s3_uri;
 
-pub fn read_to_stream(mut source: Box<dyn AsyncRead + Send + Unpin>) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)> {
+pub fn read_to_stream(mut source: Box<dyn AsyncRead + Send>) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)> {
     let (sink, stream) = tokio::sync::mpsc::channel(100);
 
     let read_fut = async move {

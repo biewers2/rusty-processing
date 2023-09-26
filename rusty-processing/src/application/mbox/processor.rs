@@ -56,92 +56,85 @@ impl Process for MboxProcessor {
 
 #[cfg(test)]
 mod tests {
-    use std::{path, thread};
-    use std::fs::File;
-    use std::sync::mpsc::Receiver;
+    use std::path;
+
+    use tokio::sync::mpsc::Receiver;
+    use tokio::task::JoinHandle;
+
+    use crate::processing::ProcessContextBuilder;
+    use crate::test_util::byte_stream_from_fs;
 
     use super::*;
 
-    fn processor_with_context() -> anyhow::Result<(MboxProcessor, ProcessContext, Receiver<anyhow::Result<ProcessOutputContext>>)> {
-        let (context, rx) = ProcessContext::new(
-            "application/mbox",
-            vec![],
-        );
-        Ok((MboxProcessor::default(), context, rx))
+    type ProcessFuture = JoinHandle<anyhow::Result<()>>;
+    type OutputReceiver = Receiver<anyhow::Result<ProcessOutput>>;
+
+    fn processor_with_context() -> anyhow::Result<(MboxProcessor, ProcessContext, Receiver<anyhow::Result<ProcessOutput>>)> {
+        let (output_sink, outputs) = tokio::sync::mpsc::channel(10);
+        let ctx = ProcessContextBuilder::new("application/mbox", vec![], output_sink).build();
+        Ok((MboxProcessor, ctx, outputs))
     }
 
-    fn sort_embedded_outputs(outputs: &mut Vec<ProcessOutputContext>) {
-        outputs.sort_by(|a, b| {
-            match (&a.output_type, &b.output_type) {
-                (ProcessOutputForm::Embedded, ProcessOutputForm::Embedded) => a.dupe_id.cmp(&b.dupe_id),
-                _ => panic!("expected embedded output"),
-            }
+    fn process(path: path::PathBuf) -> anyhow::Result<(ProcessFuture, OutputReceiver)> {
+        let (processor, ctx, output_rx) = processor_with_context()?;
+        let proc_fut = tokio::spawn(async move {
+            let stream = byte_stream_from_fs(path).await?;
+            processor.process(ctx, stream).await?;
+            anyhow::Ok(())
         });
+        Ok((proc_fut, output_rx))
     }
 
-    #[test]
-    fn test_process() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn test_process() -> anyhow::Result<()> {
         let path = path::PathBuf::from("resources/mbox/ubuntu-no-small.mbox");
-        let (processor, context, mut rx) = processor_with_context()?;
+        let (proc_fut, mut output_rx) = process(path)?;
 
-        let outputs = thread::scope(move |scope| {
-            let handle = thread::spawn(move || {
-                let file = Box::new(File::open(path).unwrap());
-                processor.process(file, context);
-            });
-
-            let mut outputs = vec![];
-            while let Ok(output) = rx.recv() {
-                outputs.push(output?)
+        let mut outputs = vec![];
+        while let Some(output) = output_rx.recv().await {
+            match output? {
+                ProcessOutput::Processed(_, _) => panic!("Expected embedded output"),
+                ProcessOutput::Embedded(state, data, _) => outputs.push((state, data))
             }
+        }
+        proc_fut.await??;
 
-            // Sort to make the services deterministic
-            sort_embedded_outputs(&mut outputs);
-            anyhow::Ok(outputs)
-        })?;
+        // Sort to make the test deterministic
+        outputs.sort_by(|o0, o1| o0.1.dupe_id.cmp(&o1.1.dupe_id));
 
         assert_eq!(outputs.len(), 2);
 
-        let output = & outputs[0];
-        assert_eq!(output.output_type, ProcessOutputForm::Embedded);
-        assert_eq!(output.mimetype, "message/rfc822");
-        assert_eq!(output.dupe_id, "4d338bc9f95d450a9372caa2fe0dfc97");
+        let (state, ctx) = &outputs[0];
+        assert_eq!(ctx.mimetype, "message/rfc822");
+        assert_eq!(ctx.dupe_id, "4d338bc9f95d450a9372caa2fe0dfc97");
+        assert_eq!(state.id_chain, Vec::<String>::new());
 
-        let output = & outputs[1];
-        assert_eq!(output.output_type, ProcessOutputForm::Embedded);
-        assert_eq!(output.mimetype, "message/rfc822");
-        assert_eq!(output.dupe_id, "5e574a8f0d36b8805722b4e5ef3b7fd9");
+        let (state, ctx) = &outputs[1];
+        assert_eq!(ctx.mimetype, "message/rfc822");
+        assert_eq!(ctx.dupe_id, "5e574a8f0d36b8805722b4e5ef3b7fd9");
+        assert_eq!(state.id_chain, Vec::<String>::new());
 
         Ok(())
     }
 
-    #[test]
-    fn test_process_large_file() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn test_process_large_file() -> anyhow::Result<()> {
         let path = path::PathBuf::from("resources/mbox/ubuntu-no.mbox");
-        let (processor, context, mut rx) = processor_with_context()?;
+        let (proc_fut, mut output_rx) = process(path)?;
 
-        let outputs = thread::scope(|scope| {
-            scope.spawn(|| {
-                let file = Box::new(File::open(path).unwrap());
-                processor.process(file, context);
-            });
-
-            let mut outputs = vec![];
-            while let Ok(output) = rx.recv() {
-                outputs.push(output?)
+        let mut output_count = 0;
+        while let Some(output) = output_rx.recv().await {
+            match output? {
+                ProcessOutput::Processed(_, _) => panic!("Expected embedded output"),
+                ProcessOutput::Embedded(_, data, _) => {
+                    output_count += 1;
+                    assert_eq!(data.mimetype, "message/rfc822");
+                }
             }
-
-            // Sort to make the services deterministic
-            sort_embedded_outputs(&mut outputs);
-            anyhow::Ok(outputs)
-        })?;
-
-        assert_eq!(outputs.len(), 344);
-        for output in outputs {
-            assert_eq!(output.output_type, ProcessOutputForm::Embedded);
-            assert_eq!(output.mimetype, "message/rfc822");
         }
+        proc_fut.await??;
 
+        assert_eq!(output_count, 344);
         Ok(())
     }
 }

@@ -4,14 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
+default = ["mail"]
 mail = []
 
 [dependencies]
 rusty-processing-identify = { version = "0.1.0", path = "../rusty-processing-identify" }
 bytes = "1.5"
 futures = "0.3"
-tokio-stream = "0.1"
 async-trait = "0.1"
+async-stream = "0.3"
 serde = { version = "~1.0.186", features = ["derive"] }
 json = "0.12.4"
 lazy_static = "~1.4.0"
@@ -27,6 +28,11 @@ mockall = "~0.11.4"
 version = "1.32"
 features = ["full"]
 
+[dependencies.tokio-stream]
+version = "0.1"
+features = ["io-util"]
+
 [dev-dependencies]
 pretty_assertions = "~1.4.0"
+rand = "0.8"
 

@@ -18,6 +18,8 @@ pub mod common;
 ///
 pub mod processing;
 
+pub(crate) mod services;
+
 pub(crate) mod application {
     #[cfg(feature = "mail")]
     pub mod mbox;
