@@ -1,13 +1,16 @@
 use std::io::{BufReader, Read};
+use std::ops::Deref;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
+use rusty_processing_identify::identifier;
 
-use crate::common::{ByteStream, StreamReader};
+use crate::common::{ByteStream};
 use crate::common::workspace::Workspace;
 use crate::processing::{Process, ProcessContext, ProcessOutput};
+use crate::stream_io::stream_to_read;
 
 /// MboxProcessor is responsible for processing mbox files.
 ///
@@ -33,23 +36,18 @@ impl MboxProcessor {
     ///
     async fn write_message(&self, ctx: &ProcessContext, message: Message) -> anyhow::Result<ProcessOutput> {
         let mimetype = "message/rfc822";
-        let Workspace { original_path, dupe_id, .. } = Workspace::new(
-            message.contents(),
-            mimetype,
-            &[],
-        )?;
-
+        let Workspace { original_path: original_file, .. } = Workspace::new(message.contents(), &[])?;
         let ctx = ctx.new_clone(mimetype.to_string());
+        let dedupe_id = identifier(mimetype).identify(message.contents());
 
-        Ok(ProcessOutput::embedded(&ctx, original_path, mimetype.to_string(), dupe_id))
+        Ok(ProcessOutput::embedded(&ctx, "mbox-message.eml", original_file, mimetype, dedupe_id))
     }
 }
 
 #[async_trait]
 impl Process for MboxProcessor {
     async fn process(&self, ctx: ProcessContext, content: ByteStream) -> anyhow::Result<()> {
-        let content = StreamReader::new(Box::new(content));
-        let reader = BufReader::new(content);
+        let reader = BufReader::new(stream_to_read(content));
         self.write_messages(ctx, MessageIterator::new(reader)).await
     }
 }
@@ -100,18 +98,18 @@ mod tests {
         proc_fut.await??;
 
         // Sort to make the test deterministic
-        outputs.sort_by(|o0, o1| o0.1.dupe_id.cmp(&o1.1.dupe_id));
+        outputs.sort_by(|o0, o1| o0.1.dedupe_id.cmp(&o1.1.dedupe_id));
 
         assert_eq!(outputs.len(), 2);
 
         let (state, ctx) = &outputs[0];
         assert_eq!(ctx.mimetype, "message/rfc822");
-        assert_eq!(ctx.dupe_id, "4d338bc9f95d450a9372caa2fe0dfc97");
+        assert_eq!(ctx.dedupe_id, "4d338bc9f95d450a9372caa2fe0dfc97");
         assert_eq!(state.id_chain, Vec::<String>::new());
 
         let (state, ctx) = &outputs[1];
         assert_eq!(ctx.mimetype, "message/rfc822");
-        assert_eq!(ctx.dupe_id, "5e574a8f0d36b8805722b4e5ef3b7fd9");
+        assert_eq!(ctx.dedupe_id, "5e574a8f0d36b8805722b4e5ef3b7fd9");
         assert_eq!(state.id_chain, Vec::<String>::new());
 
         Ok(())

@@ -5,7 +5,7 @@ use crate::services::s3_client;
 use crate::util::parse_s3_uri;
 
 pub struct S3GetObject {
-    pub body: Box<dyn AsyncRead + Send>,
+    pub body: Box<dyn AsyncRead + Send + Unpin>,
 }
 
 impl S3GetObject {

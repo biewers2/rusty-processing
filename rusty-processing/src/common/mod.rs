@@ -7,15 +7,11 @@ use std::pin::Pin;
 use bytes::Bytes;
 use futures::Stream;
 
-pub(crate) use readable_stream::*;
-
 /// Service for creating a "workspace" for processing files.
 ///
 /// A workspace is a location inside a specified directory that is used to store the file output from processing.
 ///
 pub(crate) mod workspace;
-
-mod readable_stream;
 
 /// A representation of a stream of `bytes::Bytes`
 /// 

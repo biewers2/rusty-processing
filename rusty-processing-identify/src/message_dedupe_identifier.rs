@@ -4,16 +4,16 @@ use lazy_static::lazy_static;
 use mail_parser::MessageParser;
 use uuid::Uuid;
 
-use crate::identify::{Identify, IdentifyDupeService};
-use crate::md5_dupe_identifier::md5_dupe_identifier;
+use crate::{Identify, IdentifyDedupeService};
+use crate::md5_dedupe_identifier;
 
 lazy_static! {
-    static ref MESSAGE_DUPE_IDENTIFIER: IdentifyDupeService =
-        Box::<MessageDupeIdentifier>::default();
+    static ref MESSAGE_DUPE_IDENTIFIER: IdentifyDedupeService =
+        Box::<MessageDedupeIdentifier>::default();
 }
 
 /// Returns a reference to the message dupe identifier service singleton.
-pub fn message_dupe_identifier() -> &'static IdentifyDupeService {
+pub fn message_dedupe_identifier() -> &'static IdentifyDedupeService {
     &MESSAGE_DUPE_IDENTIFIER
 }
 
@@ -21,9 +21,9 @@ pub fn message_dupe_identifier() -> &'static IdentifyDupeService {
 /// randomly generated UUID.
 ///
 #[derive(Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MessageDupeIdentifier;
+pub struct MessageDedupeIdentifier;
 
-impl Identify for MessageDupeIdentifier {
+impl Identify for MessageDedupeIdentifier {
     fn identify(&self, raw: &[u8]) -> String {
         let message = MessageParser::default().parse(raw);
         let raw_id = message
@@ -32,7 +32,7 @@ impl Identify for MessageDupeIdentifier {
             .map(|id| Cow::from(id.as_bytes()))
             .unwrap_or_else(|| Cow::from(Uuid::new_v4().as_ref().to_owned()));
 
-        md5_dupe_identifier().identify(&raw_id)
+        md5_dedupe_identifier().identify(&raw_id)
     }
 }
 
@@ -40,15 +40,15 @@ impl Identify for MessageDupeIdentifier {
 mod tests {
     use std::any::{Any, TypeId};
 
-    use crate::identify::IdentifyDupeService;
+    use crate::identify::IdentifyDedupeService;
 
     use super::*;
 
     #[test]
     fn check_message_dupe_identifier_singleton() {
         assert_eq!(
-            message_dupe_identifier().type_id(),
-            TypeId::of::<IdentifyDupeService>()
+            message_dedupe_identifier().type_id(),
+            TypeId::of::<IdentifyDedupeService>()
         );
     }
 }

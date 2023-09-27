@@ -1,16 +1,102 @@
+use std::future::Future;
 use std::io::Read;
 use std::ops::Deref;
 use std::pin::Pin;
-use bytes::Bytes;
-use futures::{Stream, StreamExt};
 
-pub struct StreamReader<S: Stream<Item=Bytes> + Send + Sync> {
+use bytes::Bytes;
+use futures::{Stream, StreamExt, TryFutureExt};
+use futures::executor::block_on;
+use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio_stream::wrappers::ReceiverStream;
+
+use crate::common::ByteStream;
+
+type SyncReader = Box<dyn Read + Send + Unpin>;
+type AsyncReader = Box<dyn AsyncRead + Send + Unpin>;
+
+/// Given an object that's `Read`, create a byte stream to stream bytes from that object.
+///
+/// # Arguments
+///
+/// * `source` - The object to read from.
+///
+/// # Returns
+///
+/// * `Ok((ByteStream, Future))` - If the object was read successfully, `ByteStream` is the stream of bytes from the `Read` object,
+///    and the `Future` represents the concurrent operation doing the actual reading from the object.
+/// * `Err(_)` - If there was an error reading from the object.
+///
+pub fn read_to_stream(mut source: SyncReader) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)> {
+    read_to_stream_helper(move |buf| {
+            source.read(buf.as_mut()).map_err(anyhow::Error::new)
+    })
+}
+
+/// Given an object that's `AsyncRead`, create a byte stream to stream bytes from that object.
+///
+/// # Arguments
+///
+/// * `source` - The object to read from.
+///
+/// # Returns
+///
+/// * `Ok((ByteStream, Future))` - If the object was read successfully, `ByteStream` is the stream of bytes from the `AsyncRead` object,
+///   and the `Future` represents the concurrent operation doing the actual reading from the object.
+/// * `Err(_)` - If there was an error reading from the object.
+///
+pub fn async_read_to_stream(mut source: AsyncReader) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)> {
+    read_to_stream_helper(move |buf| {
+        block_on(source.read(buf).map_err(anyhow::Error::new))
+    })
+}
+
+/// Helper function to create a byte stream where the reading is done through the provided `read` function.
+///
+fn read_to_stream_helper(mut read: impl FnMut(&mut [u8]) -> anyhow::Result<usize>) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)> {
+    let (sink, stream) = tokio::sync::mpsc::channel(100);
+
+    let reading = async move {
+        let mut buf = Box::new([0; 1024 * 1024]);
+
+        loop {
+            let bytes_read = read(buf.as_mut())?;
+            if bytes_read == 0 {
+                break;
+            }
+            println!("Transferring {} bytes", bytes_read);
+            let bytes = Bytes::copy_from_slice(&buf[..bytes_read]);
+            sink.send(bytes).await?;
+        }
+
+        anyhow::Ok(())
+    };
+
+    let stream = Box::pin(ReceiverStream::new(stream));
+    Ok((stream, reading))
+}
+
+/// Given a stream of bytes, create a `Read` object to read from that stream.
+///
+/// # Arguments
+///
+/// * `stream` - The stream of bytes to read from.
+///
+/// # Returns
+///
+/// * `Ok(SyncReader)` - If the stream was converted successfully, `SyncReader` is the `Read` object to read from the stream.
+/// * `Err(_)` - If there was an error converting the stream.
+///
+pub fn stream_to_read(stream: ByteStream) -> SyncReader {
+    Box::new(StreamReader::new(stream))
+}
+
+struct StreamReader<S: Stream<Item=Bytes> + Send + Sync> {
     inner: Pin<Box<S>>,
     buffer: Vec<u8>,
 }
 
 impl<S: Stream<Item=Bytes> + Send + Sync> StreamReader<S> {
-    pub fn new(inner: S) -> Self {
+    fn new(inner: S) -> Self {
         Self {
             inner: Box::pin(inner),
             buffer: Vec::new(),
@@ -58,6 +144,7 @@ impl<S: Stream<Item=Bytes> + Send + Sync> Read for StreamReader<S> {
 #[cfg(test)]
 mod tests {
     use std::io::Read;
+
     use crate::common::StreamReader;
     use crate::test_util::{byte_stream_from_string, random_byte_stream};
 

@@ -1,15 +1,15 @@
 use lazy_static::lazy_static;
 
-use crate::identify::{Identify, IdentifyDupeService};
+use crate::{Identify, IdentifyDedupeService};
 
 lazy_static! {
-    static ref MD5_DUPE_IDENTIFIER: IdentifyDupeService = Box::<Md5DupeIdentifier>::default();
+    static ref MD5_DEDUPE_IDENTIFIER: IdentifyDedupeService = Box::<Md5DedupeIdentifier>::default();
 }
 
 /// Returns a reference to the MD5 dupe identifier service singleton.
 ///
-pub fn md5_dupe_identifier() -> &'static IdentifyDupeService {
-    &MD5_DUPE_IDENTIFIER
+pub fn md5_dedupe_identifier() -> &'static IdentifyDedupeService {
+    &MD5_DEDUPE_IDENTIFIER
 }
 
 /// MD5 dupe identifier.
@@ -17,9 +17,9 @@ pub fn md5_dupe_identifier() -> &'static IdentifyDupeService {
 /// This identifier uses the MD5 hash of the raw bytes to identify duplicates.
 ///
 #[derive(Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Md5DupeIdentifier;
+pub struct Md5DedupeIdentifier;
 
-impl Identify for Md5DupeIdentifier {
+impl Identify for Md5DedupeIdentifier {
     fn identify(&self, raw: &[u8]) -> String {
         format!("{:x}", md5::compute(raw))
     }
@@ -32,10 +32,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_md5_dupe_identifier_singleton() {
+    fn check_md5_dedupe_identifier_singleton() {
         assert_eq!(
-            md5_dupe_identifier().type_id(),
-            TypeId::of::<IdentifyDupeService>()
+            md5_dedupe_identifier().type_id(),
+            TypeId::of::<IdentifyDedupeService>()
         );
     }
 }

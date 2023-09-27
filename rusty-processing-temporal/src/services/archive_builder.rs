@@ -1,6 +1,23 @@
 use std::fs::File;
-use std::io::Seek;
-use std::path::Path;
+use std::io::{Seek, Write};
+use std::path;
+use anyhow::anyhow;
+
+use tempfile::TempPath;
+use tokio::io::AsyncReadExt;
+
+#[derive(Debug)]
+pub struct ArchiveEntry {
+    name: String,
+    path: TempPath,
+    id_chain: Vec<String>,
+}
+
+impl ArchiveEntry {
+    pub fn new(name: String, path: TempPath, id_chain: Vec<String>) -> Self {
+        Self { name, path, id_chain }
+    }
+}
 
 pub struct ArchiveBuilder {
     zipper: zip::ZipWriter<File>,
@@ -14,8 +31,8 @@ impl ArchiveBuilder {
         Ok(Self { zipper })
     }
 
-    pub fn add_new(&mut self, file_path: impl AsRef<Path>) -> anyhow::Result<()> {
-        let path = file_path.as_ref();
+    pub async fn append(&mut self, entry: ArchiveEntry) -> anyhow::Result<()> {
+        let path = self.archive_entry_path(&entry.id_chain, &entry.name);
         let path_parent = path.parent().ok_or(anyhow::anyhow!("No parent"))?;
 
         let path_string = path.to_string_lossy().to_string();
@@ -23,6 +40,7 @@ impl ArchiveBuilder {
 
         self.zipper.add_directory(base_path_string, Default::default())?;
         self.zipper.start_file(path_string, Default::default())?;
+        self.write_file_content(&entry.path).await?;
         Ok(())
     }
 
@@ -30,5 +48,30 @@ impl ArchiveBuilder {
         let mut file = self.zipper.finish()?;
         file.rewind()?;
         Ok(file)
+    }
+
+    fn archive_entry_path(&self, embedded_dupe_chain: &[String], name: &str) -> path::PathBuf {
+        let mut path = path::PathBuf::new();
+        for dedupe_id in embedded_dupe_chain {
+            path.push(dedupe_id);
+        }
+        path.push(name);
+        path
+    }
+
+    async fn write_file_content(&mut self, path: &path::Path) -> anyhow::Result<()> {
+        let mut file = tokio::fs::File::open(path).await?;
+
+        let mut content = Box::new([0; 10000]);
+        loop {
+            let bytes_read = file.read(content.as_mut()).await?;
+            if bytes_read == 0 {
+                break;
+            }
+            if self.zipper.write(&content[..bytes_read])? == 0 {
+                return Err(anyhow!("ZIP writer unexpectedly closed"));
+            }
+        }
+        Ok(())
     }
 }

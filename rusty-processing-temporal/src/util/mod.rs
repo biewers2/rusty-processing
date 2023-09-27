@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::path;
 
 use bytes::Bytes;
 use tokio::io::{AsyncRead, AsyncReadExt};
@@ -9,32 +8,3 @@ pub use parse_s3_uri::*;
 use rusty_processing::common::ByteStream;
 
 mod parse_s3_uri;
-
-pub fn read_to_stream(mut source: Box<dyn AsyncRead + Send>) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)> {
-    let (sink, stream) = tokio::sync::mpsc::channel(100);
-
-    let read_fut = async move {
-        let mut buf = vec![0; 1024 * 1024];
-
-        loop {
-            let bytes_read = source.read(&mut buf).await?;
-            if bytes_read == 0 {
-                break;
-            }
-            println!("Transferring {} bytes", bytes_read);
-            let bytes = Bytes::copy_from_slice(&buf[..bytes_read]);
-            sink.send(bytes).await?;
-        }
-
-        Ok(())
-    };
-
-    let stream = Box::new(ReceiverStream::new(stream));
-    Ok((stream, read_fut))
-}
-
-pub fn path_file_name_or_random(path: impl AsRef<path::Path>) -> String {
-    path.as_ref().file_name()
-        .map(|name| name.to_string_lossy().to_string())
-        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string())
-}

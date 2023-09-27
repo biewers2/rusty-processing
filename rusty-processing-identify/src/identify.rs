@@ -1,6 +1,6 @@
 /// Defines a type for a boxed [`Identify`] implementation.
 ///
-pub type IdentifyDupeService = Box<dyn Identify>;
+pub type IdentifyDedupeService = Box<dyn Identify>;
 
 /// Defines the interface for a duplicate file identification service.
 ///

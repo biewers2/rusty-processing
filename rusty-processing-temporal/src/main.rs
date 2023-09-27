@@ -1,4 +1,8 @@
-use rusty_processing_temporal::activities::process_rusty_file;
+use futures::future::try_join;
+use tokio::io::BufReader;
+use tokio::try_join;
+use rusty_processing::stream_io::{async_read_to_stream, read_to_stream};
+use rusty_processing_temporal::activities::{process_rusty_file, process_rusty_stream};
 
 const WORKER_BUILD_ID: &str = "rusty-mime-process-builder";
 const TASK_QUEUE: &str = "rusty-mime-process";
@@ -10,11 +14,17 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn start_worker() -> anyhow::Result<()> {
-    let s3_uri = "s3://mime-processing-test/ubuntu-no.mbox";
-    let output_s3_uri = format!("{}.zip", s3_uri);
+    // let s3_uri = "s3://mime-processing-test/ubuntu-no-small.mbox";
+    // let output_s3_uri = format!("{}.zip", s3_uri);
     let mimetype = "application/mbox";
 
-    process_rusty_file(s3_uri, output_s3_uri, mimetype).await?;
+    // process_rusty_file(s3_uri, output_s3_uri, mimetype, true).await?;
+    let abs_path = "/home/biewers2/Repos/mime-processing/rusty-processing/rusty-processing/resources/mbox/ubuntu-no-small.mbox";
+    let file = Box::new(BufReader::new(tokio::fs::File::open(abs_path).await?));
+    let (stream, reading) = async_read_to_stream(file)?;
+    let processing = process_rusty_stream(stream, mimetype, true);
+
+    try_join!(reading, processing)?;
     Ok(())
 
     // let server_options = sdk_client_options(Url::from_str("http://localhost:7233")?).build()?;

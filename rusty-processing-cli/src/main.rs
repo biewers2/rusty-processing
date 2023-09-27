@@ -1,12 +1,12 @@
-use std::fs::File;
 use std::path;
 
 use clap::Parser;
+use tokio::try_join;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
-use cli::read_to_stream;
 
 use rusty_processing::processing::{ProcessContextBuilder, processor, ProcessType};
+use rusty_processing::stream_io::async_read_to_stream;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -75,10 +75,8 @@ async fn main() -> anyhow::Result<()> {
         args.types
     };
 
-    let (input_sink, input_stream) = tokio::sync::mpsc::channel(100);
-    let input_stream = Box::new(ReceiverStream::new(input_stream));
-    let file = File::open(&args.input)?;
-    read_to_stream(file, input_sink).await?;
+    let file = Box::new(tokio::fs::File::open(&args.input).await?);
+    let (stream, reading) = async_read_to_stream(file)?;
 
     let (output_sink, output_stream) = tokio::sync::mpsc::channel(100);
     let mut output_stream = Box::new(ReceiverStream::new(output_stream));
@@ -89,20 +87,17 @@ async fn main() -> anyhow::Result<()> {
         output_sink
     ).build();
 
-    tokio::spawn(
-        processor().process(
-            ctx,
-            input_stream,
-        )
-    );
-
-
-    while let Some(output) = output_stream.next().await {
-        match output {
-            Ok(output) => println!("{:?}", output),
-            Err(err) => println!("Error: {}", err),
+    let processing = processor().process(ctx, stream);
+    let output_handling = async {
+        while let Some(output) = output_stream.next().await {
+            match output {
+                Ok(output) => println!("{:?}", output),
+                Err(err) => println!("Error: {}", err),
+            }
         }
-    }
+        anyhow::Ok(())
+    };
 
+    try_join!(reading, processing, output_handling)?;
     Ok(())
 }

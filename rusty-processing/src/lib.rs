@@ -18,6 +18,8 @@ pub mod common;
 ///
 pub mod processing;
 
+pub mod stream_io;
+
 pub(crate) mod services;
 
 pub(crate) mod application {

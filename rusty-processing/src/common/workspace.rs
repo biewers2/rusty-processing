@@ -1,73 +1,41 @@
-use std::path;
+use std::io::Write;
 
-use rusty_processing_identify::identifier::identifier;
-use crate::common::write_to_file;
+use tempfile::{tempdir, TempPath};
 
 use crate::processing::ProcessType;
 
-/// A workspace defines a directory tree schematic.
+/// A workspace quickly creates a set of files that can be used when operating on a file.
 ///
-/// Given a context containing an output dir, it takes the content of a file and creates a set of files and file paths that
-/// can be used when operating on that file (i.e. extracting text, metadata, etc.).
-///
-/// The schematic is defined as such:
-///   ${context.output_dir}/
-///     <dupe_id_of_original>/
-///       original
-///       extracted.txt
-///       metadata.json
-///       rendered.pdf
-///
-/// `dupe_id` is the deduplication value of the original contents
-/// `entry_dir` is the directory w/ `dupe_id` as the base (this directory is scoped to the original file)
-/// `original_path` is the path to the file w/ the provided contents
-/// `text_path` is the path to where the extracted text should be written (file won't exist yet)
-/// `metadata_path` is the path to where the metadata JSON should be written (file won't exist yet)
-/// `pdf_path` is the path to where the rendered PDF should be written (file won't exist yet)
+/// `original_file` is the path to the file w/ the provided contents
+/// `text_file` is the path to where the extracted text should be written (file won't exist yet)
+/// `metadata_file` is the path to where the metadata JSON should be written (file won't exist yet)
+/// `pdf_file` is the path to where the rendered PDF should be written (file won't exist yet)
 ///
 #[derive(Debug)]
 pub struct Workspace {
-    pub dupe_id: String,
-    pub entry_dir: path::PathBuf,
-    pub original_path: path::PathBuf,
-    pub text_path: Option<path::PathBuf>,
-    pub metadata_path: Option<path::PathBuf>,
-    pub pdf_path: Option<path::PathBuf>,
+    pub original_path: TempPath,
+    pub text_path: Option<TempPath>,
+    pub metadata_path: Option<TempPath>,
+    pub pdf_path: Option<TempPath>,
 }
 
 impl Workspace {
-    /// Create a new workspace given a context containing the output directory, and the content of the original file to work on.
-    ///
-    pub fn new(
-        content: &[u8],
-        mimetype: impl AsRef<str>,
-        types: &[ProcessType]
-    ) -> anyhow::Result<Workspace> {
-        let dupe_id = identifier(&mimetype).identify(content);
+    pub fn new(content: &[u8], types: &[ProcessType]) -> anyhow::Result<Workspace> {
+        let working_dir = tempdir()?.into_path();
 
-        let output_dir = tempfile::tempdir()?.into_path();
-        let entry_dir = output_dir.join(&dupe_id);
+        let original_path = working_dir.join("original");
+        let mut original_file = std::fs::File::create(&original_path)?;
+        original_file.write_all(content)?;
 
-        let original_path = entry_dir.join("original");
-        write_to_file(content, &original_path)?;
-
-        let text_path = types.contains(&ProcessType::Text)
-            .then(|| entry_dir.join("extracted.txt"))
-            .and_then(|path| (!path.exists()).then_some(path));
-        let metadata_path = types.contains(&ProcessType::Metadata)
-            .then(|| entry_dir.join("metadata.json"))
-            .and_then(|path| (!path.exists()).then_some(path));
-        let pdf_path = types.contains(&ProcessType::Pdf)
-            .then(|| entry_dir.join("rendered.pdf"))
-            .and_then(|path| (!path.exists()).then_some(path));
+        let text_path = types.contains(&ProcessType::Text).then(|| working_dir.join("extracted.txt"));
+        let metadata_path = types.contains(&ProcessType::Metadata).then(|| working_dir.join("metadata.json"));
+        let pdf_file = types.contains(&ProcessType::Pdf).then(|| working_dir.join("rendered.pdf"));
 
         Ok(Workspace {
-            dupe_id,
-            entry_dir,
-            original_path,
-            text_path,
-            metadata_path,
-            pdf_path,
+            original_path: TempPath::from_path(original_path),
+            text_path: text_path.map(TempPath::from_path),
+            metadata_path: metadata_path.map(TempPath::from_path),
+            pdf_path: pdf_file.map(TempPath::from_path),
         })
     }
 }
@@ -78,43 +46,22 @@ mod test {
 
     #[test]
     fn test_workspace_no_types() -> anyhow::Result<()> {
-        let mimetype = "text/plain".to_string();
-        let dupe_id = "3adbbad1791fbae3ec908894c4963870";
+        let workspace = Workspace::new(b"hello, world!", &[])?;
 
-        let workspace = Workspace::new(
-            b"hello, world!",
-            mimetype,
-            &[],
-        )?;
-
-        let base = path::PathBuf::from(dupe_id);
-        assert_eq!(workspace.dupe_id, dupe_id);
-        assert!(workspace.original_path.ends_with(base.join("original")));
-        assert_eq!(workspace.text_path, None);
-        assert_eq!(workspace.metadata_path, None);
-        assert_eq!(workspace.pdf_path, None);
-
+        assert!(workspace.text_path.is_none());
+        assert!(workspace.metadata_path.is_none());
+        assert!(workspace.pdf_path.is_none());
         Ok(())
     }
 
     #[test]
     fn test_workspace_all_types() -> anyhow::Result<()> {
-        let mimetype = "text/plain";
         let types = vec![ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf];
-        let dupe_id = "3adbbad1791fbae3ec908894c4963870";
+        let workspace = Workspace::new(b"hello, world!", &types)?;
 
-        let workspace = Workspace::new(
-            b"hello, world!",
-            mimetype,
-            &types,
-        )?;
-
-        let base = path::PathBuf::from(dupe_id);
-        assert_eq!(workspace.dupe_id, dupe_id);
-        assert!(workspace.original_path.ends_with(base.join("original")));
-        assert!(workspace.text_path.unwrap().ends_with(base.join("extracted.txt")));
-        assert!(workspace.metadata_path.unwrap().ends_with(base.join("metadata.json")));
-        assert!(workspace.pdf_path.unwrap().ends_with(base.join("rendered.pdf")));
+        assert!(workspace.text_path.is_some());
+        assert!(workspace.metadata_path.is_some());
+        assert!(workspace.pdf_path.is_some());
         Ok(())
     }
 }

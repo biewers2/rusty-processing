@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::Read;
-use std::path;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -8,10 +7,13 @@ use futures::try_join;
 use mail_parser::{Message, MessageParser, MimeHeaders};
 use serde::{Deserialize, Serialize};
 
-use crate::common::{ByteStream, StreamReader};
+use rusty_processing_identify::identifier;
+
+use crate::common::ByteStream;
 use crate::common::workspace::Workspace;
 use crate::message::rfc822::mimetype;
 use crate::processing::{Process, ProcessContext, ProcessOutput};
+use crate::stream_io::stream_to_read;
 
 #[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub struct Rfc822Processor;
@@ -20,15 +22,12 @@ impl Rfc822Processor {
     /// Processes a message by extracting text and metadata, rendering a PDF, and then finding any embedded attachments.
     ///
     async fn process(&self, ctx: ProcessContext, message: Message<'_>) -> anyhow::Result<()> {
-        let wkspace = Workspace::new(
-            &message.raw_message,
-            &ctx.mimetype,
-            &ctx.types
-        )?;
+        let dedupe_id = identifier(&ctx.mimetype).identify(message.raw_message());
+        let wkspace = Workspace::new(&message.raw_message, &ctx.types)?;
 
-        let text_fut = self.process_text(&ctx, &message, wkspace.text_path, &wkspace.dupe_id);
-        let meta_fut = self.process_metadata(&ctx, &message, wkspace.metadata_path, &wkspace.dupe_id);
-        let pdf_fut = self.process_pdf(&ctx, &message, wkspace.pdf_path, &wkspace.dupe_id);
+        let text_fut = self.process_text(&ctx, &message, wkspace.text_path, &dedupe_id);
+        let meta_fut = self.process_metadata(&ctx, &message, wkspace.metadata_path, &dedupe_id);
+        let pdf_fut = self.process_pdf(&ctx, &message, wkspace.pdf_path, &dedupe_id);
         let attach_fut = self.process_attachments(&ctx, &message);
 
         try_join!(text_fut, meta_fut, pdf_fut, attach_fut)?;
@@ -41,13 +40,13 @@ impl Rfc822Processor {
         &self,
         ctx: &ProcessContext,
         message: &Message<'_>,
-        path: Option<path::PathBuf>,
-        dupe_id: impl Into<String>,
+        path: Option<tempfile::TempPath>,
+        dedupe_id: impl Into<String>,
     ) -> anyhow::Result<()> {
         if let Some(path) = path {
             let mut writer = File::create(&path)?;
             let result = self.extract_text(message, &mut writer).map(|_|
-                ProcessOutput::processed(ctx, path, "text/plain".to_string(), dupe_id.into())
+                ProcessOutput::processed(ctx, "extracted.txt", path, "text/plain", dedupe_id)
             );
             ctx.add_output(result).await?;
         }
@@ -61,17 +60,16 @@ impl Rfc822Processor {
         &self,
         ctx: &ProcessContext,
         message: &Message<'_>,
-        path: Option<path::PathBuf>,
-        dupe_id: impl Into<String>,
+        path: Option<tempfile::TempPath>,
+        dedupe_id: impl Into<String>,
     ) -> anyhow::Result<()> {
         if let Some(path) = path {
             let mut writer = File::create(&path)?;
             let result = self.extract_metadata(message, &mut writer).map(|_|
-                ProcessOutput::processed(ctx, path, "application/json".to_string(), dupe_id.into())
+                ProcessOutput::processed(ctx, "metadata.json", path, "application/json", dedupe_id)
             );
             ctx.add_output(result).await?;
         }
-
         Ok(())
     }
 
@@ -81,17 +79,16 @@ impl Rfc822Processor {
         &self,
         ctx: &ProcessContext,
         message: &Message<'_>,
-        path: Option<path::PathBuf>,
-        dupe_id: impl Into<String>,
+        path: Option<tempfile::TempPath>,
+        dedupe_id: impl Into<String>,
     ) -> anyhow::Result<()> {
         if let Some(path) = path {
             let mut writer = File::create(&path)?;
             let result = self.render_pdf(message, &mut writer).map(|_|
-                ProcessOutput::processed(ctx, path,  "application/pdf".to_string(), dupe_id.into())
+                ProcessOutput::processed(ctx, "rendered.pdf", path, "application/pdf", dedupe_id)
             );
             ctx.add_output(result).await?;
         }
-
         Ok(())
     }
 
@@ -106,13 +103,11 @@ impl Rfc822Processor {
                 .content_type()
                 .ok_or(anyhow!("failed to get attachment content type"))?;
             let mimetype = mimetype(content_type);
-            let Workspace { original_path, dupe_id, .. } = Workspace::new(
-                part.contents(),
-                &mimetype,
-                &[]
-            )?;
+            let dedupe_id = identifier(&mimetype).identify(part.contents());
+            let name = part.attachment_name().unwrap_or("message-attachment.dat");
+            let Workspace { original_path: original_file, .. } = Workspace::new(part.contents(), &[])?;
 
-            ctx.add_output(Ok(ProcessOutput::embedded(ctx, original_path, mimetype, dupe_id))).await?;
+            ctx.add_output(Ok(ProcessOutput::embedded(ctx, name, original_file, mimetype, dedupe_id))).await?;
         }
 
         Ok(())
@@ -123,7 +118,7 @@ impl Rfc822Processor {
 impl Process for Rfc822Processor {
     async fn process(&self, ctx: ProcessContext, content: ByteStream) -> anyhow::Result<()> {
         let mut raw = Vec::new();
-        let mut reader = StreamReader::new(Box::new(content));
+        let mut reader = stream_to_read(content);
         reader.read_to_end(&mut raw)?;
 
         let parser = MessageParser::default();

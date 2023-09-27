@@ -1,14 +1,14 @@
-mod processor;
-mod process;
-
-use std::path;
 use std::str::FromStr;
+
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
-pub use self::processor::*;
 pub(crate) use self::process::*;
+pub use self::processor::*;
+
+mod processor;
+mod process;
 
 /// The type of output to produce from processing.
 ///
@@ -154,6 +154,15 @@ impl ProcessContextBuilder {
         self
     }
 
+    /// Sets the ID chain.
+    ///
+    /// See `ProcessState.id_chain` for more information.
+    ///
+    pub fn id_chain(mut self, id_chain: Vec<String>) -> Self {
+        self.state.id_chain = id_chain;
+        self
+    }
+
     /// Build the ProcessContext.
     ///
     pub fn build(self) -> ProcessContext {
@@ -181,7 +190,7 @@ impl From<ProcessContext> for ProcessContextBuilder {
 ///
 /// It can be either a new file or an embedded file.
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ProcessOutput {
     /// A newly created file as a result of processing the original file.
     ///
@@ -196,19 +205,23 @@ pub enum ProcessOutput {
 ///
 /// It contains the path, mimetype and the deduplication identifier.
 ///
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct ProcessOutputData {
-    /// Path to the output file.
+    /// The name to give the output file.
     ///
-    pub path: path::PathBuf,
+    pub name: String,
+
+    /// The output file.
+    ///
+    pub path: tempfile::TempPath,
 
     /// Mimetype of the output file.
     ///
     pub mimetype: String,
 
-    /// Dupe ID of the output file.
+    /// Deduplication ID of the output file.
     ///
-    pub dupe_id: String,
+    pub dedupe_id: String,
 }
 
 impl ProcessOutput {
@@ -219,15 +232,22 @@ impl ProcessOutput {
     /// * `ctx` - The ProcessContext of the processing operation.
     /// * `path` - The path to the output file.
     /// * `mimetype` - The MIME type of the output file.
-    /// * `dupe_id` - The dupe ID of the output file.
+    /// * `dedupe_id` - The dupe ID of the output file.
     ///
-    pub fn processed(ctx: &ProcessContext, path: path::PathBuf, mimetype: String, dupe_id: String) -> Self {
+    pub fn processed(
+        ctx: &ProcessContext,
+        name: impl Into<String>,
+        path: tempfile::TempPath,
+        mimetype: impl Into<String>,
+        dedupe_id: impl Into<String>,
+    ) -> Self {
         Self::Processed(
             ctx.state.clone(),
             ProcessOutputData {
+                name: name.into(),
                 path,
-                mimetype,
-                dupe_id,
+                mimetype: mimetype.into(),
+                dedupe_id: dedupe_id.into(),
             }
         )
     }
@@ -239,15 +259,22 @@ impl ProcessOutput {
     /// * `ctx` - The ProcessContext of the processing operation.
     /// * `path` - The path to the output file.
     /// * `mimetype` - The MIME type of the output file.
-    /// * `dupe_id` - The dupe ID of the output file.
+    /// * `dedupe_id` - The dupe ID of the output file.
     ///
-    pub fn embedded(ctx: &ProcessContext, path: path::PathBuf, mimetype: String, dupe_id: String) -> Self {
+    pub fn embedded(
+        ctx: &ProcessContext,
+        name: impl Into<String>,
+        path: tempfile::TempPath,
+        mimetype: impl Into<String>,
+        dedupe_id: impl Into<String>,
+    ) -> Self {
         Self::Embedded(
             ctx.state.clone(),
             ProcessOutputData {
+                name: name.into(),
                 path,
-                mimetype,
-                dupe_id,
+                mimetype: mimetype.into(),
+                dedupe_id: dedupe_id.into(),
             },
             ctx.output_sink.clone(),
         )
