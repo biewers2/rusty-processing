@@ -1,4 +1,4 @@
-use std::process::{ExitStatus, Stdio};
+use std::process::ExitStatus;
 
 use lazy_static::lazy_static;
 use tokio::io::{AsyncRead, AsyncWrite};

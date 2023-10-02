@@ -6,7 +6,7 @@ use std::pin::Pin;
 use bytes::Bytes;
 use futures::{Stream, StreamExt, TryFutureExt};
 use futures::executor::block_on;
-use tempfile::{NamedTempFile, tempdir};
+use tempfile::NamedTempFile;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio_stream::wrappers::ReceiverStream;
 

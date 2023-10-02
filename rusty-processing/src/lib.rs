@@ -30,7 +30,7 @@ pub(crate) mod message {
 
 pub(crate) mod workspace {
     use std::io::Write;
-    use tempfile::{tempdir, TempDir, TempPath};
+    use tempfile::TempPath;
     use crate::io::temp_path;
     use crate::processing::ProcessType;
 
@@ -55,9 +55,9 @@ pub(crate) mod workspace {
             let mut original_file = std::fs::File::create(&original_path)?;
             original_file.write_all(content)?;
 
-            let text_path = types.contains(&ProcessType::Text).then(|| temp_path()).transpose()?;
-            let metadata_path = types.contains(&ProcessType::Metadata).then(|| temp_path()).transpose()?;
-            let pdf_path = types.contains(&ProcessType::Pdf).then(|| temp_path()).transpose()?;
+            let text_path = types.contains(&ProcessType::Text).then(temp_path).transpose()?;
+            let metadata_path = types.contains(&ProcessType::Metadata).then(temp_path).transpose()?;
+            let pdf_path = types.contains(&ProcessType::Pdf).then(temp_path).transpose()?;
 
             Ok(Workspace {
                 original_path,
