@@ -9,7 +9,7 @@ use crate::message::rfc822::transformer::MessageTransformer;
 use crate::services::wkhtmltopdf;
 
 impl Rfc822Processor {
-    pub fn render_pdf<W>(&self, message: &Message, writer: &mut W) -> anyhow::Result<()>
+    pub async fn render_pdf<W>(&self, message: &Message<'_>, writer: &mut W) -> anyhow::Result<()>
         where W: Write,
     {
         let transformer = MessageTransformer::new(Box::<HtmlMessageVisitor>::default());
@@ -18,13 +18,13 @@ impl Rfc822Processor {
         let mut pdf: Vec<u8> = Vec::new();
 
         transformer.transform(message, &mut html)?;
-        self.render_html_to_pdf(html.to_vec(), &mut pdf)?;
+        self.render_html_to_pdf(html.to_vec(), &mut pdf).await?;
         writer.write_all(pdf.as_ref())?;
         Ok(())
     }
 
-    fn render_html_to_pdf(&self, html: Vec<u8>, output: &mut Vec<u8>) -> anyhow::Result<()> {
-        let status = wkhtmltopdf().run(html.as_ref(), output)?;
+    async fn render_html_to_pdf(&self, html: Vec<u8>, output: &mut Vec<u8>) -> anyhow::Result<()> {
+        let status = wkhtmltopdf().run(html.as_ref(), output).await?;
         if !status.success() && status.code().is_some_and(|code| code != 1) {
             Err(anyhow!("wkhtmltopdf exited with status {}", status))?;
         }

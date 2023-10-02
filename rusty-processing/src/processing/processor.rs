@@ -1,8 +1,8 @@
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use crate::io::ByteStream;
 
-use crate::common::ByteStream;
 use crate::processing::ProcessContext;
 use crate::processing::process::Process;
 
@@ -33,11 +33,8 @@ impl Processor {
     ///
     /// # Arguments
     ///
-    /// * `source_stream` - Stream of data in `bytes::Bytes` of the content to process.
-    /// * `output_sink` - The sender used to send the output artifacts from processing. This allows for concurrent handling
-    ///     of the output by the caller.
-    /// * `mimetype` - The MIME type of the file to process.
-    /// * `types` - The types of output to generate.
+    /// * `ctx` - Context of the processing operation.
+    /// * `stream` - Stream of data in `bytes::Bytes` of the content to process.
     ///
     pub async fn process(
         &self,

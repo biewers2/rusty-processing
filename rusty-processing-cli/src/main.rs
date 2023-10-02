@@ -5,8 +5,8 @@ use tokio::try_join;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
 
-use rusty_processing::processing::{ProcessContextBuilder, processor, ProcessType};
-use rusty_processing::stream_io::async_read_to_stream;
+use rusty_processing::io::async_read_to_stream;
+use rusty_processing::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessType};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -89,15 +89,34 @@ async fn main() -> anyhow::Result<()> {
 
     let processing = processor().process(ctx, stream);
     let output_handling = async {
-        while let Some(output) = output_stream.next().await {
-            match output {
-                Ok(output) => println!("{:?}", output),
-                Err(err) => println!("Error: {}", err),
-            }
+        while let Some(output) = output_stream.next().await.transpose()? {
+            write_output(output, &args.output)?;
         }
         anyhow::Ok(())
     };
 
     try_join!(reading, processing, output_handling)?;
+    Ok(())
+}
+
+fn write_output(output: ProcessOutput, output_dir: impl AsRef<path::Path>) -> anyhow::Result<()> {
+    let (source_path, output_path) = match output {
+        ProcessOutput::Processed(_, data) => {
+            let output_path = output_dir.as_ref().join(data.name);
+            (data.path, output_path)
+        },
+        ProcessOutput::Embedded(_, data, _) => {
+            let output_dir = output_dir.as_ref().join(data.dedupe_id);
+            std::fs::create_dir(&output_dir)?;
+
+            let output_path = output_dir.join(data.name);
+            (data.path, output_path)
+        },
+    };
+
+    let mut output_file = std::fs::File::create(output_path)?;
+    let mut source_file = std::fs::File::open(source_path)?;
+    std::io::copy(&mut source_file, &mut output_file)?;
+
     Ok(())
 }

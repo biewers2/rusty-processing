@@ -9,11 +9,11 @@ use serde::{Deserialize, Serialize};
 
 use rusty_processing_identify::identifier;
 
-use crate::common::ByteStream;
-use crate::common::workspace::Workspace;
+use crate::io::ByteStream;
+use crate::workspace::Workspace;
 use crate::message::rfc822::mimetype;
 use crate::processing::{Process, ProcessContext, ProcessOutput};
-use crate::stream_io::stream_to_read;
+use crate::io::stream_to_read;
 
 #[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub struct Rfc822Processor;
@@ -84,7 +84,7 @@ impl Rfc822Processor {
     ) -> anyhow::Result<()> {
         if let Some(path) = path {
             let mut writer = File::create(&path)?;
-            let result = self.render_pdf(message, &mut writer).map(|_|
+            let result = self.render_pdf(message, &mut writer).await.map(|_|
                 ProcessOutput::processed(ctx, "rendered.pdf", path, "application/pdf", dedupe_id)
             );
             ctx.add_output(result).await?;

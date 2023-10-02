@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 use temporal_sdk::ActContext;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use rusty_processing::common::ByteStream;
+use rusty_processing::io::ByteStream;
 use rusty_processing::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessType};
-use rusty_processing::stream_io::async_read_to_stream;
+use rusty_processing::io::async_read_to_stream;
 
 use crate::io::{S3GetObject, upload};
 use crate::services::{ArchiveBuilder, ArchiveEntry};
@@ -186,7 +186,6 @@ async fn handle_output_asynchronously(output: ProcessOutput, recurse: bool, arch
     } else {
         handle_process_output(output).await
     };
-    println!("Archive entry result: {:?}", archive_entry);
 
     match archive_entry {
         Ok(archive_entry) => archive_entry_sink.send(archive_entry).await.unwrap(),
@@ -248,6 +247,7 @@ async fn handle_process_output(output: ProcessOutput) -> anyhow::Result<ArchiveE
 async fn build_archive(mut entries: Receiver<ArchiveEntry>) -> anyhow::Result<std::fs::File> {
     let mut archive_builder = ArchiveBuilder::new()?;
     while let Some(archive_path) = entries.recv().await {
+        println!("Adding to archive: {:?}", archive_path);
         archive_builder.append(archive_path).await?;
     }
     archive_builder.build()

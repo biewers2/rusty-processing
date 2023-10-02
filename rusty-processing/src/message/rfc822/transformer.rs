@@ -8,13 +8,13 @@ use crate::message::rfc822::message_visitor::MessageVisitor;
 /// Service to transform message content using a provided visitor implementation.
 ///
 pub struct MessageTransformer {
-    visitor: Box<dyn MessageVisitor>,
+    visitor: Box<dyn MessageVisitor + Send + Sync>,
 }
 
 impl MessageTransformer {
     /// Creates a new transformer that will use the provided visitor to transform the message.
     ///
-    pub fn new(visitor: Box<dyn MessageVisitor>) -> Self {
+    pub fn new(visitor: Box<dyn MessageVisitor + Send + Sync>) -> Self {
         Self { visitor }
     }
 
@@ -149,9 +149,9 @@ impl MessageTransformer {
 mod test {
     use std::borrow::Cow;
 
-    use crate::test_util;
     use anyhow::anyhow;
     use mail_parser::{Addr, ContentType, DateTime, Group, Host, MessageParser, Received};
+    use crate::test_utils::read_contents;
 
     use super::*;
 
@@ -270,7 +270,7 @@ mod test {
 
     #[test]
     fn test_transform() -> anyhow::Result<()> {
-        let content = test_util::read_contents("resources/rfc822/headers-small.eml")?;
+        let content = read_contents("resources/rfc822/headers-small.eml")?;
         let message = MessageParser::default().parse(&content).ok_or(anyhow!("Failed to parse message"))?;
         let transformer = MessageTransformer::new(Box::new(TestVisitor {}));
 

@@ -1,5 +1,5 @@
 use std::io::{BufReader, Read};
-use std::ops::Deref;
+
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -7,10 +7,10 @@ use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
 use rusty_processing_identify::identifier;
 
-use crate::common::{ByteStream};
-use crate::common::workspace::Workspace;
+use crate::io::ByteStream;
+use crate::workspace::Workspace;
 use crate::processing::{Process, ProcessContext, ProcessOutput};
-use crate::stream_io::stream_to_read;
+use crate::io::stream_to_read;
 
 /// MboxProcessor is responsible for processing mbox files.
 ///
@@ -36,11 +36,11 @@ impl MboxProcessor {
     ///
     async fn write_message(&self, ctx: &ProcessContext, message: Message) -> anyhow::Result<ProcessOutput> {
         let mimetype = "message/rfc822";
-        let Workspace { original_path: original_file, .. } = Workspace::new(message.contents(), &[])?;
+        let Workspace { original_path, .. } = Workspace::new(message.contents(), &[])?;
         let ctx = ctx.new_clone(mimetype.to_string());
         let dedupe_id = identifier(mimetype).identify(message.contents());
 
-        Ok(ProcessOutput::embedded(&ctx, "mbox-message.eml", original_file, mimetype, dedupe_id))
+        Ok(ProcessOutput::embedded(&ctx, "mbox-message.eml", original_path, mimetype, dedupe_id))
     }
 }
 
@@ -60,7 +60,7 @@ mod tests {
     use tokio::task::JoinHandle;
 
     use crate::processing::ProcessContextBuilder;
-    use crate::test_util::byte_stream_from_fs;
+    use crate::test_utils::byte_stream_from_fs;
 
     use super::*;
 

@@ -94,13 +94,13 @@ mod test {
     use mail_parser::MessageParser;
 
     use crate::message::rfc822::transformer::MessageTransformer;
-    use crate::test_util;
+    use crate::test_utils::read_contents;
 
     use super::*;
 
     #[test]
     fn test_text_message_visitor() -> anyhow::Result<()> {
-        let content = test_util::read_contents("resources/rfc822/headers-small.eml")?;
+        let content = read_contents("resources/rfc822/headers-small.eml")?;
         let message = MessageParser::default().parse(&content).ok_or(anyhow!("Failed to parse message"))?;
         let visitor = Box::<HtmlMessageVisitor>::default();
         let transformer = MessageTransformer::new(visitor);

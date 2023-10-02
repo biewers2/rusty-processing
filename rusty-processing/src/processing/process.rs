@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use crate::common::ByteStream;
+use crate::io::ByteStream;
 
 use crate::processing::ProcessContext;
 

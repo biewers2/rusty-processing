@@ -1,7 +1,9 @@
+use std::process::{ExitStatus, Stdio};
+
 use lazy_static::lazy_static;
-use std::io::{Read, Write};
-use std::process::{Command, ExitStatus, Stdio};
-use std::thread;
+use tokio::io::{AsyncRead, AsyncWrite};
+
+use crate::services::stream_command;
 
 const DEFAULT_ARGS: [&str; 15] = [
     "--quiet",
@@ -35,46 +37,33 @@ pub fn wkhtmltopdf() -> &'static WkhtmltopdfService {
 pub struct Wkhtmltopdf {}
 
 impl Wkhtmltopdf {
-    pub fn run(&self, input: &[u8], output: &mut Vec<u8>) -> anyhow::Result<ExitStatus> {
-        let mut proc = Command::new("wkhtmltopdf")
-            .args(DEFAULT_ARGS)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()?;
-
-        let mut stdin = proc.stdin.take();
-        let mut stdout = proc.stdout.take();
-
-        thread::scope(move |_| {
-            if let Some(mut stdin) = stdin.take() {
-                stdin.write_all(input).unwrap();
-            }
-        });
-
-        if let Some(mut stdout) = stdout.take() {
-            stdout.read_to_end(output)?;
-        }
-
-        Ok(proc.wait()?)
+    pub async fn run<R, W>(&self, mut input: R, mut output: W) -> anyhow::Result<ExitStatus>
+    where
+        R: AsyncRead + Unpin,
+        W: AsyncWrite + Unpin,
+    {
+        let mut process = stream_command("wkhtmltopdf", &DEFAULT_ARGS, &mut input, &mut output).await?;
+        Ok(process.wait().await?)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::any::{Any, TypeId};
+    use tokio::io::AsyncReadExt;
 
-    #[test]
-    fn check_wkhtmltopdf_installed() -> anyhow::Result<()> {
-        let mut proc = Command::new("which")
+    use super::*;
+
+    #[tokio::test]
+    async fn check_wkhtmltopdf_installed() -> anyhow::Result<()> {
+        let mut proc = tokio::process::Command::new("which")
             .args(["wkhtmltopdf"])
             .stdout(Stdio::piped())
             .spawn()?;
 
         let mut output = String::new();
-        proc.stdout.take().unwrap().read_to_string(&mut output)?;
-        let status = proc.wait()?;
+        proc.stdout.take().unwrap().read_to_string(&mut output).await?;
+        let status = proc.wait().await?;
 
         assert!(status.success());
         assert_ne!(output, "".to_string());
@@ -86,10 +75,11 @@ mod tests {
         assert_eq!(wkhtmltopdf().type_id(), TypeId::of::<Box<Wkhtmltopdf>>());
     }
 
-    #[test]
-    fn test_wkhtmltopdf() {
+    #[tokio::test]
+    async fn test_wkhtmltopdf() {
+        let input = b"hello world".to_vec();
         let mut output = vec![];
-        let status = wkhtmltopdf().run(b"hello world", &mut output).unwrap();
+        let status = wkhtmltopdf().run(input.as_ref(), &mut output).await.unwrap();
 
         assert!(status.success());
         assert_ne!(output.len(), 0);

@@ -33,6 +33,6 @@ version = "0.1"
 features = ["io-util"]
 
 [dev-dependencies]
+serde_json = "1.0"
 pretty_assertions = "~1.4.0"
 rand = "0.8"
-
