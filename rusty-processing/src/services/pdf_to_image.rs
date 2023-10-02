@@ -37,7 +37,7 @@ impl PdfToImage {
         R: AsyncRead + Unpin,
         W: AsyncWrite + Unpin,
     {
-        let mut process = stream_command("gs", &DEFAULT_ARGS, &mut input, &mut output).await?;
+        let mut process = stream_command(PROGRAM, &DEFAULT_ARGS, &mut input, &mut output).await?;
         Ok(process.wait().await?)
     }
 }

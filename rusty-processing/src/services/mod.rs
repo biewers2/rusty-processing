@@ -6,13 +6,13 @@ mod pdf_to_image;
 use std::ffi::OsStr;
 use std::process::Stdio;
 pub(crate) use wkhtmltopdf::*;
-pub(crate) use pdf_to_image::*;
+
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::try_join;
 
 async fn stream_command<R, W, S>(
-    program: impl AsRef<str>,
+    _program: impl AsRef<str>,
     arguments: impl IntoIterator<Item=S>,
     mut input: R,
     mut output: W,

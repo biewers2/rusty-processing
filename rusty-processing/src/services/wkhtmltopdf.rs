@@ -2,8 +2,11 @@ use std::process::ExitStatus;
 
 use lazy_static::lazy_static;
 use tokio::io::{AsyncRead, AsyncWrite};
+use crate::processing::ProcessOutput::Processed;
 
 use crate::services::stream_command;
+
+const PROGRAM: &str = "wkhtmltopdf";
 
 const DEFAULT_ARGS: [&str; 15] = [
     "--quiet",
@@ -42,7 +45,7 @@ impl Wkhtmltopdf {
         R: AsyncRead + Unpin,
         W: AsyncWrite + Unpin,
     {
-        let mut process = stream_command("wkhtmltopdf", &DEFAULT_ARGS, &mut input, &mut output).await?;
+        let mut process = stream_command(PROGRAM, &DEFAULT_ARGS, &mut input, &mut output).await?;
         Ok(process.wait().await?)
     }
 }
