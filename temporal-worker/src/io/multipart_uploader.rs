@@ -17,7 +17,7 @@ impl MultipartUploader {
         Ok(Self { bucket, key })
     }
 
-    pub async fn upload(&self, reader: &mut (dyn AsyncRead + Unpin)) -> anyhow::Result<()> {
+    pub async fn upload(&self, reader: &mut (dyn AsyncRead + Send + Sync + Unpin)) -> anyhow::Result<()> {
         let multipart_upload = s3_client()
             .await
             .create_multipart_upload()
@@ -36,8 +36,8 @@ impl MultipartUploader {
 
     async fn upload_parts(
         &self,
-        upload_id: &dyn AsRef<str>,
-        reader: &mut (dyn AsyncRead + Unpin),
+        upload_id: impl AsRef<str>,
+        reader: &mut (dyn AsyncRead + Send + Sync + Unpin),
     ) -> anyhow::Result<Vec<CompletedPart>> {
         let mut parts = vec![];
         let mut buf = Box::new([0; MB as usize]);
@@ -74,7 +74,7 @@ impl MultipartUploader {
 
     async fn complete_upload(
         &self,
-        upload_id: &dyn AsRef<str>,
+        upload_id: impl AsRef<str>,
         parts: Vec<CompletedPart>,
     ) -> anyhow::Result<()> {
         let completed_multipart_upload = CompletedMultipartUpload::builder()

@@ -219,6 +219,10 @@ pub struct ProcessOutputData {
     ///
     pub mimetype: String,
 
+    /// The types of output generated.
+    ///
+    pub types: Vec<ProcessType>,
+
     /// Deduplication ID of the output file.
     ///
     pub dedupe_id: String,
@@ -247,6 +251,7 @@ impl ProcessOutput {
                 name: name.into(),
                 path,
                 mimetype: mimetype.into(),
+                types: ctx.types.clone(),
                 dedupe_id: dedupe_id.into(),
             }
         )
@@ -274,6 +279,7 @@ impl ProcessOutput {
                 name: name.into(),
                 path,
                 mimetype: mimetype.into(),
+                types: ctx.types.clone(),
                 dedupe_id: dedupe_id.into(),
             },
             ctx.output_sink.clone(),

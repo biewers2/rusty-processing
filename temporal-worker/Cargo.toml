@@ -21,11 +21,9 @@ tempfile = "~3.8.0"
 temporal-sdk = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core-api = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
-threadpool = "1.8.1"
 tokio-stream = "0.1"
 url = "~2.4.0"
 uuid = { version = "1.4.1", features = ["v4"] }
-zip = { version = "0.6.6", default-features = false }
 
 [dependencies.processing]
 version = "0.1.0"

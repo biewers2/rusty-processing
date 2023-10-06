@@ -34,8 +34,6 @@ where R: Read + io::Seek
         (name, emb_path)
     };
 
-    println!("name: {}", name);
-
     let mut emb_file = tokio::fs::File::open(&path).await?;
     let dedupe = dedupe_checksum(&mut emb_file).await?;
 

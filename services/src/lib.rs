@@ -9,15 +9,18 @@ use bytesize::MB;
 use tokio::join;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-pub use html_to_pdf::*;
-pub use pdf_to_image::*;
-pub use tika::*;
 
 /// Service for converting HTML to PDF.
 ///
+mod archive_builder;
 mod html_to_pdf;
 mod pdf_to_image;
 mod tika;
+
+pub use archive_builder::*;
+pub use html_to_pdf::*;
+pub use pdf_to_image::*;
+pub use tika::*;
 
 /// Error type for when a command execution fails.
 ///

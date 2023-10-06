@@ -3,11 +3,10 @@ use std::io::{Seek, Write};
 use std::path;
 use anyhow::anyhow;
 use bytesize::MB;
-
 use tempfile::TempPath;
+
 use tokio::io::AsyncReadExt;
 
-#[derive(Debug)]
 pub struct ArchiveEntry {
     name: String,
     path: TempPath,
