@@ -1,0 +1,37 @@
+[package]
+name = "temporal-worker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { version = "~1.0", features = ["backtrace"] }
+async-recursion = "1.0"
+async_once = "~0.2.6"
+aws-config = "~0.56.1"
+aws-sdk-s3 = "~0.31"
+bytes = "1.5.0"
+bytesize = "1"
+filesize = "~0.2.0"
+futures = "0.3"
+lazy_static = "~1.4.0"
+serde = { version = "~1.0.186", features = ["derive"] }
+tempfile = "~3.8.0"
+temporal-sdk = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
+temporal-sdk-core = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
+temporal-sdk-core-api = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
+threadpool = "1.8.1"
+tokio-stream = "0.1"
+url = "~2.4.0"
+uuid = { version = "1.4.1", features = ["v4"] }
+zip = { version = "0.6.6", default-features = false }
+
+[dependencies.processing]
+version = "0.1.0"
+path = "../processing"
+features = ["mail"]
+
+[dependencies.tokio]
+version = "1.32"
+features = ["full"]

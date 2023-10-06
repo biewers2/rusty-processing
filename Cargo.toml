@@ -1,8 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-  "rusty-processing",
-  "rusty-processing-identify",
-  "rusty-processing-cli",
-  "rusty-processing-temporal",
+  "processing",
+  "cli",
+  "identify",
+  "services",
+  "temporal-worker",
 ]

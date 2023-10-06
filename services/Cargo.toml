@@ -1,0 +1,16 @@
+[package]
+name = "services"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "~1.0.75"
+bytesize = "1"
+file-format = "0.21"
+lazy_static = "1.4"
+log = "0.4.20"
+serde = { version = "1.0.188", features = ["derive"] }
+
+[dependencies.tokio]
+version = "1.32"
+features = ["full"]
