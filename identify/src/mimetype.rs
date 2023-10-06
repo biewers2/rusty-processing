@@ -25,8 +25,8 @@ pub async fn identify_mimetype(content: impl AsyncRead + Send + Unpin) -> anyhow
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
-    use std::io::BufReader;
+    
+    
     use super::*;
 
     #[tokio::test]

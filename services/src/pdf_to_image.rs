@@ -61,8 +61,8 @@ impl PdfToImage {
 #[cfg(test)]
 mod tests {
     use std::any::{Any, TypeId};
-    use std::process::Stdio;
-    use tokio::io::AsyncReadExt;
+    
+    
     use crate::test_utils::assert_command_successful;
 
     use super::*;

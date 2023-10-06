@@ -180,11 +180,6 @@ Backflush w/ cleaner";
 
     #[tokio::test]
     async fn test_tika_text_with_ocr() -> anyhow::Result<()> {
-        let expected_stderr = "\
-INFO  [main] 22:49:03,296 org.apache.tika.parser.ocr.TesseractOCRParser Tesseract is installed and is being invoked. \
-This can add greatly to processing time.  If you do not want tesseract to be applied to your files see: \
-https://cwiki.apache.org/confluence/display/TIKA/TikaOCR#TikaOCR-disable-ocr";
-
         let input_path = "../resources/jpg/jQuery-text.jpg";
         let file = tokio::fs::File::open(input_path).await?;
         let mut text = vec![];

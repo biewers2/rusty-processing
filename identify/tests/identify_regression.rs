@@ -1,4 +1,4 @@
-use std::io::Cursor;
+
 
 struct IdentifyTestCase {
     path: String,
