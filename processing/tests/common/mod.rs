@@ -20,7 +20,7 @@ pub mod assertions {
                 break;
             }
             assert_eq!(exp_size, act_size);
-            assert!(exp_buf[..exp_size] == act_buf[..act_size], "Expected and actual files are different");
+            assert_eq!(exp_buf[..exp_size], act_buf[..act_size], "Expected and actual files are different");
         }
     }
 
