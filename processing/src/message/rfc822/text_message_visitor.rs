@@ -70,7 +70,7 @@ mod test {
 
     #[test]
     fn test_text_message_visitor() -> anyhow::Result<()> {
-        let content = read_contents("../resources/rfc822/headers-small.eml")?;
+        let content = read_contents("../resources/rfc822/headers-small.eml").unwrap();
         let message = MessageParser::default().parse(&content).ok_or(anyhow!("Failed to parse message"))?;
         let visitor = Box::<TextMessageVisitor>::default();
         let transformer = MessageTransformer::new(visitor);

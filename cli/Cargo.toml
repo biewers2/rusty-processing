@@ -5,12 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { version = "~1.0", features = ["backtrace"] }
-bytes = "1.5"
 clap = { version = "~4.4.0", features = ["derive"] }
 processing = { version = "0.1", path = "../processing" }
 streaming = { version = "0.1", path = "../streaming" }
-tokio-stream = "0.1"
-
-[dependencies.tokio]
-version = "1.32"
-features = ["full"]
+tokio = "1.32"

@@ -270,7 +270,7 @@ mod test {
 
     #[test]
     fn test_transform() -> anyhow::Result<()> {
-        let content = read_contents("../resources/rfc822/headers-small.eml")?;
+        let content = read_contents("../resources/rfc822/headers-small.eml").unwrap();
         let message = MessageParser::default().parse(&content).ok_or(anyhow!("Failed to parse message"))?;
         let transformer = MessageTransformer::new(Box::new(TestVisitor {}));
 

@@ -6,32 +6,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { version = "~1.0", features = ["backtrace"] }
-async-recursion = "1.0"
-async_once = "~0.2.6"
-aws-config = "~0.56.1"
-aws-sdk-s3 = "~0.31"
-bytes = "1.5.0"
+anyhow = { version = "1.0", features = ["backtrace"] }
+async_once = "0.2"
+aws-config = { version = "0.56", default-features = false }
+aws-sdk-s3 = { version = "0.33", default-features = false, features = ["rt-tokio"] }
 bytesize = "1"
-filesize = "~0.2.0"
-futures = "0.3"
-lazy_static = "~1.4.0"
-serde = { version = "~1.0.186", features = ["derive"] }
+futures = { version = "0.3", features = ["executor"] }
+lazy_static = "1.4"
+processing = { version = "0.1",  path = "../processing", features = ["mail"] }
+serde = { version = "1.0", features = ["derive"] }
 services = { version = "0.1", path = "../services" }
 streaming = { version = "0.1", path = "../streaming" }
-tempfile = "~3.8.0"
 temporal-sdk = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core-api = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
-tokio-stream = "0.1"
-url = "~2.4.0"
-uuid = { version = "1.4.1", features = ["v4"] }
-
-[dependencies.processing]
-version = "0.1.0"
-path = "../processing"
-features = ["mail"]
-
-[dependencies.tokio]
-version = "1.32"
-features = ["full"]
+tokio = { version = "1.32" }
+tokio-stream = { version = "0.1", default-features = false }
+url = "2.4"

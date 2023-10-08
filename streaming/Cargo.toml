@@ -5,12 +5,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = { version = "~1.0", features = ["backtrace"] }
-async-stream = "0.3"
 bytes = "1.5"
 bytesize = "1"
-rand = "0.8.5"
 tempfile = "3.8"
-tokio = { version = "1.32", features = ["full"] }
+tokio = { version = "1.32", features = ["io-util"] }
 tokio-stream = { version = "0.1", features = ["io-util"] }
 
 [dev-dependencies]
