@@ -151,7 +151,7 @@ mod test {
 
     use anyhow::anyhow;
     use mail_parser::{Addr, ContentType, DateTime, Group, Host, MessageParser, Received};
-    use crate::test_utils::read_contents;
+    use test_utils::read_contents;
 
     use super::*;
 

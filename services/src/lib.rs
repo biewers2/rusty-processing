@@ -9,15 +9,14 @@ use bytesize::MB;
 use tokio::join;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-
-/// Service for converting HTML to PDF.
-///
 mod archive_builder;
+mod config;
 mod html_to_pdf;
 mod pdf_to_image;
 mod tika;
 
 pub use archive_builder::*;
+pub use config::*;
 pub use html_to_pdf::*;
 pub use pdf_to_image::*;
 pub use tika::*;
@@ -243,8 +242,8 @@ mod tests {
         let (mut input, mut output, mut error) = buffers(b"hello world");
 
         let result = stream_command(
-            "java",
-            vec!["-jar", "non-existing.jar"],
+            "ls",
+            vec!["-abcde"],
             &mut input,
             &mut output,
             &mut error,
@@ -253,12 +252,12 @@ mod tests {
         assert!(result.is_err());
         let command_err = result.unwrap_err();
         assert!(command_err.status.is_some());
-        assert_eq!(command_err.status.unwrap().code(), Some(1));
+        assert_eq!(command_err.status.unwrap().code(), Some(2));
         assert!(!command_err.error.to_string().is_empty());
 
         let error = trim_to_string(&error);
         assert!(output.is_empty());
-        assert_eq!(error, "Error: Unable to access jarfile non-existing.jar");
+        assert_eq!(error, "ls: invalid option -- 'e'\nTry 'ls --help' for more information.");
     }
 
     #[tokio::test]

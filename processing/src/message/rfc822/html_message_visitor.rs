@@ -92,9 +92,9 @@ impl MessageVisitor for HtmlMessageVisitor {
 mod test {
     use anyhow::anyhow;
     use mail_parser::MessageParser;
+    use test_utils::read_contents;
 
     use crate::message::rfc822::transformer::MessageTransformer;
-    use crate::test_utils::read_contents;
 
     use super::*;
 

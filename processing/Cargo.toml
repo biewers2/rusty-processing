@@ -27,18 +27,13 @@ services = { version = "0.1.0", path = "../services" }
 serde = { version = "~1.0.186", features = ["derive"] }
 streaming = { version = "0.1", path = "../streaming" }
 tempfile = "~3.8.0"
+tokio = { version = "1.32", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["io-util"] }
 threadpool = "1.8.1"
 zip = { version = "0.6.6", default-features = false }
 
-[dependencies.tokio]
-version = "1.32"
-features = ["full"]
-
-[dependencies.tokio-stream]
-version = "0.1"
-features = ["io-util"]
-
 [dev-dependencies]
-serde_json = "1.0"
 pretty_assertions = "~1.4.0"
 rand = "0.8"
+serde_json = "1.0"
+test-utils = { version = "0.1", path = "../test-utils" }

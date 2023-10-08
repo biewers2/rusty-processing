@@ -10,6 +10,8 @@ services:
     environment:
       - TEMPORAL_HOST
       - TEMPORAL_PORT
+      - TIKA_HOST
+      - TIKA_PORT
     volumes:
       - .:/code
     networks:
@@ -22,4 +24,4 @@ services:
     networks:
       - temporal-network
     ports:
-      - 9998:9998
+      - "9998:9998"

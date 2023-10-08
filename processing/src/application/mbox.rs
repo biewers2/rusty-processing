@@ -62,7 +62,7 @@ mod tests {
 
     use tokio::sync::mpsc::Receiver;
     use tokio::task::JoinHandle;
-    use streaming::test_utils::byte_stream_from_fs;
+    use test_utils::byte_stream_from_fs;
 
     use crate::processing::ProcessContextBuilder;
 

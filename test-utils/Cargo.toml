@@ -1,5 +1,5 @@
 [package]
-name = "streaming"
+name = "test-utils"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,11 +7,6 @@ edition = "2021"
 anyhow = { version = "~1.0", features = ["backtrace"] }
 async-stream = "0.3"
 bytes = "1.5"
-bytesize = "1"
-rand = "0.8.5"
-tempfile = "3.8"
+rand = "0.8"
 tokio = { version = "1.32", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["io-util"] }
-
-[dev-dependencies]
-test-utils = { version = "0.1", path = "../test-utils" }

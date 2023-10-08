@@ -3,9 +3,9 @@ mod common;
 use std::{fs, path};
 use std::fs::File;
 use serde::Deserialize;
-use processing::io::read_to_stream;
 use processing::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessOutputData, ProcessState, ProcessType};
 use common::assertions::{assert_identical, assert_identical_metadata};
+use streaming::read_to_stream;
 use crate::common::assertions::assert_identical_text;
 
 #[derive(Debug, Deserialize)]

@@ -1,4 +1,3 @@
-use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -7,6 +6,7 @@ use temporal_sdk_core::{CoreRuntime, init_worker};
 use temporal_sdk_core_api::telemetry::TelemetryOptionsBuilder;
 use temporal_sdk_core_api::worker::WorkerConfigBuilder;
 use url::Url;
+use services::config;
 
 use temporal_worker::activities::process_rusty_file_activity;
 
@@ -16,8 +16,8 @@ const NAMESPACE: &str = "default";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let host = env::var("TEMPORAL_HOST").unwrap_or("localhost".to_string());
-    let port = env::var("TEMPORAL_PORT").unwrap_or("7233".to_string());
+    let host = config().get_or("TEMPORAL_HOST", "localhost");
+    let port = config().get_or("TEMPORAL_PORT", "7233");
     let url_str = format!("http://{}:{}", host, port);
     start_worker(url_str).await
 }

@@ -1,9 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
-  "processing",
   "cli",
   "identify",
+  "processing",
   "services",
+  "streaming",
   "temporal-worker",
+  "test-utils"
 ]

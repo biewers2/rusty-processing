@@ -30,10 +30,12 @@ https://github.com/temporalio/docker-compose
 Once the Temporal server and its auxiliary containers are running, set up environment variables needed by the worker.
 These can be placed in a `.env` file (recommended) or set in the shell environment where the following commands are run.
 
-| Variable        | Value      | Description                                                                                                                          |
-|-----------------|------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| `TEMPORAL_HOST` | `temporal` | Host of the temporal server to connect to; the value is defined by the name of the Docker Compose service running                    |
-| `TEMPORAL_PORT` | `7233`     | Port of the temporal server to connect to; the value is defined by the established port in the Temporal server's Docker Compose file |
+| Variable        | Value         | Description                                                                                                                             |
+|-----------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| `TEMPORAL_HOST` | `temporal`    | Host of the temporal server to connect to; the value is defined by the name of the Docker Compose service running                       |
+| `TEMPORAL_PORT` | `7233`        | Port of the temporal server to connect to; the value is defined by the established port in the Temporal server's Docker Compose file    |
+| `TIKA_HOST`     | `apache-tika` | Host of the Apache Tika server to connect to; the value is defined by the name of the Docker Compose service running                    |
+| `TIKA_PORT`     | `9998`        | Port of the Apache Tika server to connect to; the value is defined by the established port in the Temporal server's Docker Compose file |
 
 Then run the following commands:
 
