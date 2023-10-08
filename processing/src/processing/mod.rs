@@ -4,11 +4,9 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
-pub(crate) use self::process::*;
 pub use self::processor::*;
 
 mod processor;
-mod process;
 
 /// The type of output to produce from processing.
 ///

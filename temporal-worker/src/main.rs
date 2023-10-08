@@ -1,3 +1,4 @@
+use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -15,13 +16,18 @@ const NAMESPACE: &str = "default";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    start_worker().await
+    let host = env::var("TEMPORAL_HOST").unwrap_or("localhost".to_string());
+    let port = env::var("TEMPORAL_PORT").unwrap_or("7233".to_string());
+    let url_str = format!("http://{}:{}", host, port);
+    start_worker(url_str).await
 }
 
-async fn start_worker() -> anyhow::Result<()> {
-    let server_options = sdk_client_options(Url::from_str("http://localhost:7233")?).build()?;
-
+async fn start_worker(address: impl AsRef<str>) -> anyhow::Result<()> {
+    let addr = address.as_ref();
+    println!("Connecting to Temporal at {}", addr);
+    let server_options = sdk_client_options(Url::from_str(addr)?).build()?;
     let client = server_options.connect(NAMESPACE, None, None).await?;
+    println!("Connected!");
 
     let telemetry_options = TelemetryOptionsBuilder::default().build()?;
     let runtime = CoreRuntime::new_assume_tokio(telemetry_options)?;

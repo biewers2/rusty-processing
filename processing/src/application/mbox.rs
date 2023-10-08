@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
-use identify::deduplication::dedupe_checksum_with_mimetype;
+use identify::deduplication::dedupe_checksum;
 
 use crate::io::ByteStream;
 use crate::io::stream_to_read;
@@ -30,14 +30,14 @@ impl MboxProcessor {
         let ctx = ctx.new_clone(mimetype.to_string());
 
         let mut contents = Cursor::new(contents);
-        let dedupe_id = dedupe_checksum_with_mimetype(&mut contents, mimetype).await?;
+        let checksum = dedupe_checksum(&mut contents, &mimetype).await?;
 
         Ok(ProcessOutput::embedded(
             &ctx,
             "mbox-message.eml",
             original_path,
-            dedupe_id.mimetype,
-            dedupe_id.checksum
+            mimetype,
+            checksum,
         ))
     }
 }

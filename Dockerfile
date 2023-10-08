@@ -1,13 +1,20 @@
-FROM rust:latest as builder
+FROM rust:latest AS dependencies
 
-WORKDIR /usr/src/rusty-processing
+RUN apt-get -y update && \
+    apt-get install -y --no-install-recommends \
+        protobuf-compiler \
+        openjdk-11-jdk-headless
+
+ENV JAVA_HOME /usr/local/openjdk-11
+ENV PATH $JAVA_HOME/bin:$PATH
+
+FROM dependencies AS builder
+
+WORKDIR /app
 COPY . .
-
-RUN apt-get update && \
-    apt-get install -y protobuf-compiler
-
-# RUN cargo install --bin cli --path cli && \
-#    cargo install --bin temporal-worker --path temporal-worker
 RUN cargo build --release
 
-CMD ["./target/release/cli"]
+FROM dependencies
+
+COPY --from=builder /app/target/release/temporal-worker /usr/local/bin/temporal-worker
+CMD ["temporal-worker"]

@@ -52,11 +52,15 @@ async fn test_identify() {
 
 fn identify(test_case: IdentifyTestCase) -> tokio::task::JoinHandle<IdentifyAssertion> {
     tokio::spawn(async move {
-        let mut file = tokio::fs::File::open(test_case.path).await.unwrap();
-        let dedupe = identify::deduplication::dedupe_checksum(&mut file).await.unwrap();
+        let file = tokio::fs::File::open(&test_case.path).await.unwrap();
+        let mimetype = identify::mimetype::identify_mimetype(file).await.unwrap();
+
+        let file = tokio::fs::File::open(&test_case.path).await.unwrap();
+        let checksum = identify::deduplication::dedupe_checksum(file, &mimetype).await.unwrap();
+
         IdentifyAssertion {
-            checksum: (dedupe.checksum, test_case.expected_checksum),
-            mimetype: (dedupe.mimetype, test_case.expected_mimetype),
+            checksum: (checksum, test_case.expected_checksum),
+            mimetype: (mimetype, test_case.expected_mimetype),
         }
     })
 }

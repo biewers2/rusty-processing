@@ -1,0 +1,25 @@
+version: "3.8"
+
+networks:
+  temporal-network:
+    external: true
+
+services:
+  rusty-processing-worker:
+    image: rusty-processing-worker:latest
+    environment:
+      - TEMPORAL_HOST
+      - TEMPORAL_PORT
+    volumes:
+      - .:/code
+    networks:
+      - temporal-network
+
+  apache-tika:
+    image: apache/tika:latest
+    volumes:
+      - .:/code
+    networks:
+      - temporal-network
+    ports:
+      - 9998:9998

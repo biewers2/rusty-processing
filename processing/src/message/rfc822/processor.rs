@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use futures::try_join;
 use mail_parser::{Message, MessageParser, MimeHeaders};
 use serde::{Deserialize, Serialize};
-use identify::deduplication::dedupe_checksum_with_mimetype;
+use identify::deduplication::dedupe_checksum;
 
 use crate::io::ByteStream;
 use crate::io::stream_to_read;
@@ -24,12 +24,12 @@ impl Rfc822Processor {
         let content = message.raw_message();
         let mut reader = Cursor::new(content);
 
-        let dedupe = dedupe_checksum_with_mimetype(&mut reader, &ctx.mimetype).await?;
+        let checksum = dedupe_checksum(&mut reader, &ctx.mimetype).await?;
         let wkspace = Workspace::new(&message.raw_message, &ctx.types)?;
 
-        let text_fut = self.process_text(&ctx, &message, wkspace.text_path, &dedupe.checksum);
-        let meta_fut = self.process_metadata(&ctx, &message, wkspace.metadata_path, &dedupe.checksum);
-        let pdf_fut = self.process_pdf(&ctx, &message, wkspace.pdf_path, &dedupe.checksum);
+        let text_fut = self.process_text(&ctx, &message, wkspace.text_path, &checksum);
+        let meta_fut = self.process_metadata(&ctx, &message, wkspace.metadata_path, &checksum);
+        let pdf_fut = self.process_pdf(&ctx, &message, wkspace.pdf_path, &checksum);
         let attach_fut = self.process_attachments(&ctx, &message);
 
         try_join!(text_fut, meta_fut, pdf_fut, attach_fut)?;
@@ -107,12 +107,12 @@ impl Rfc822Processor {
             let mimetype = mimetype(content_type);
 
             let mut reader = Cursor::new(part.contents());
-            let dedupe = dedupe_checksum_with_mimetype(&mut reader, &mimetype).await?;
+            let checksum = dedupe_checksum(&mut reader, &mimetype).await?;
 
             let name = part.attachment_name().unwrap_or("message-attachment.dat");
             let Workspace { original_path, .. } = Workspace::new(part.contents(), &[])?;
 
-            ctx.add_output(Ok(ProcessOutput::embedded(ctx, name, original_path, mimetype, dedupe.checksum))).await?;
+            ctx.add_output(Ok(ProcessOutput::embedded(ctx, name, original_path, mimetype, checksum))).await?;
         }
 
         Ok(())

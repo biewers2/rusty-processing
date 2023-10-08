@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use tempfile::TempPath;
 use zip::ZipArchive;
 
-use identify::deduplication::{dedupe_checksum, Deduplication};
+use identify::deduplication::dedupe_checksum;
+use identify::mimetype::identify_mimetype;
 
 use crate::io::{ByteStream, stream_to_read, temp_path};
 use crate::processing::{Process, ProcessContext, ProcessOutput};
@@ -17,7 +18,8 @@ use crate::processing::{Process, ProcessContext, ProcessOutput};
 struct ArchiveEntry {
     name: String,
     path: TempPath,
-    dedupe: Deduplication,
+    dedupe_checksum: String,
+    mimetype: String,
 }
 
 async fn next_archive_entry<R>(archive: &mut ZipArchive<R>, index: usize) -> anyhow::Result<ArchiveEntry>
@@ -34,13 +36,17 @@ where R: Read + io::Seek
         (name, emb_path)
     };
 
-    let mut emb_file = tokio::fs::File::open(&path).await?;
-    let dedupe = dedupe_checksum(&mut emb_file).await?;
+    let emb_file = tokio::fs::File::open(&path).await?;
+    let mimetype = identify_mimetype(emb_file).await?;
+
+    let emb_file = tokio::fs::File::open(&path).await?;
+    let checksum = dedupe_checksum(emb_file, &mimetype).await?;
 
     Ok(ArchiveEntry {
         name,
         path,
-        dedupe,
+        dedupe_checksum: checksum,
+        mimetype,
     })
 }
 
@@ -74,13 +80,13 @@ impl Process for ZipProcessor {
 
         pin_mut!(output_stream);
         while let Some(result) = output_stream.next().await {
-            let ArchiveEntry { name, path, dedupe } = result?;
+            let ArchiveEntry { name, path, dedupe_checksum, mimetype } = result?;
             let output = ProcessOutput::embedded(
                 &ctx,
                 name,
                 path,
-                dedupe.mimetype,
-                dedupe.checksum,
+                mimetype,
+                dedupe_checksum,
             );
             ctx.add_output(Ok(output)).await?;
         }

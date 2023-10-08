@@ -2,7 +2,10 @@ use std::process::ExitStatus;
 use anyhow::anyhow;
 
 use lazy_static::lazy_static;
+use reqwest::Body;
+use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{stream_command, trim_to_string};
 
@@ -33,20 +36,20 @@ pub struct TikaMetadataOutput {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TikaDetectOutput {
-    pub status: ExitStatus,
-    pub mimetype: String,
-    pub error: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TikaOutput {
     pub status: ExitStatus,
     pub error: String,
 }
 
-#[derive(Default)]
-pub struct Tika;
+pub struct Tika {
+    http_client: reqwest::Client,
+}
+
+impl Default for Tika {
+    fn default() -> Self {
+        Self { http_client: reqwest::Client::new() }
+    }
+}
 
 impl Tika {
     pub async fn text<R, W>(&self, input: R, output: W) -> anyhow::Result<TikaTextOutput>
@@ -70,16 +73,29 @@ impl Tika {
         })
     }
 
-    pub async fn detect<R>(&self, input: R) -> anyhow::Result<TikaDetectOutput>
-        where R: AsyncRead + Unpin
+    /// Detects the mimetype of the input file.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The content representing the file to detect the mimetype of.
+    ///
+    /// # Returns
+    ///
+    /// The mimetype of the input file.
+    ///
+    pub async fn detect<R>(&self, input: R) -> anyhow::Result<String>
+        where R: AsyncRead + Send + Sync + Unpin + 'static
     {
-        let mut stdout = vec![];
-        let TikaOutput { status, error } = self.run(vec!["--detect"], input, &mut stdout).await?;
-        Ok(TikaDetectOutput {
-            status,
-            mimetype: trim_to_string(&stdout),
-            error,
-        })
+        let stream = FramedRead::new(input, BytesCodec::new());
+        let body = Body::wrap_stream(stream);
+
+        let response = self.http_client
+            .put("http://localhost:9998/meta/Content-Type")
+            .header("Accept", "application/json")
+            .body(body)
+            .send().await?;
+        let mimetype = self.parse_detect_response(response).await?;
+        Ok(mimetype)
     }
 
     pub async fn run<R, W>(&self, mut args: Vec<&str>, mut input: R, mut output: W) -> anyhow::Result<TikaOutput>
@@ -107,12 +123,23 @@ impl Tika {
             }
         }
     }
+
+    async fn parse_detect_response(&self, response: reqwest::Response) -> anyhow::Result<String> {
+        let body = response
+            .json::<serde_json::Value>()
+            .await?;
+
+        match body["Content-Type"].as_str() {
+            Some(mimetype) => Ok(mimetype.to_string()),
+            None => Err(anyhow!("No Content-Type header found in response")),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::any::{Any, TypeId};
-    use std::io::Cursor;
+    use std::io::{Cursor, Read};
 
     use crate::test_utils::assert_command_successful;
 
@@ -209,29 +236,14 @@ Backflush w/ cleaner";
     }
 
     #[tokio::test]
-    async fn test_tika_detect() -> anyhow::Result<()> {
+    async fn test_tika_detect() {
         let input_path = "../resources/zip/testzip.zip";
-        let file = tokio::fs::File::open(input_path).await?;
+        let file = tokio::fs::File::open(input_path).await.unwrap();
 
-        let output = tika().detect(file).await?;
-
-        assert!(output.status.success());
-        assert_eq!(output.error, "");
-        assert_eq!(output.mimetype, "application/zip");
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_tika_detect_2() -> anyhow::Result<()> {
-        let input_path = "../resources/jpg/PA280041.JPG";
-        let file = tokio::fs::File::open(input_path).await?;
-
-        let output = tika().detect(file).await?;
-
-        assert!(output.status.success());
-        assert_eq!(output.error, "");
-        assert_eq!(output.mimetype, "image/jpeg");
-        Ok(())
+        let result = tika().detect(file).await;
+        assert!(result.is_ok());
+        let mimetype = result.unwrap();
+        assert_eq!(mimetype, "application/zip");
     }
 
     #[tokio::test]

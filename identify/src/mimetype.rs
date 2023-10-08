@@ -12,15 +12,9 @@ use services::tika;
 ///
 /// The mimetype of the file.
 ///
-pub async fn identify_mimetype(content: impl AsyncRead + Send + Unpin) -> anyhow::Result<String> {
+pub async fn identify_mimetype(content: impl AsyncRead + Send + Sync + Unpin + 'static) -> anyhow::Result<String> {
     let content = Box::pin(content);
-    let output = tika().detect(content).await?;
-
-    if output.status.success() {
-        Ok(output.mimetype)
-    } else {
-        Err(anyhow!("failed to identify mimetype"))
-    }
+    tika().detect(content).await
 }
 
 #[cfg(test)]
