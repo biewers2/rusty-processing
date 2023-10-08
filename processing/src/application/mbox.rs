@@ -5,9 +5,8 @@ use async_trait::async_trait;
 use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
 use identify::deduplication::dedupe_checksum;
+use streaming::{ByteStream, stream_to_read};
 
-use crate::io::ByteStream;
-use crate::io::stream_to_read;
 use crate::processing::{Process, ProcessContext, ProcessOutput};
 use crate::workspace::Workspace;
 
@@ -63,9 +62,9 @@ mod tests {
 
     use tokio::sync::mpsc::Receiver;
     use tokio::task::JoinHandle;
+    use streaming::test_utils::byte_stream_from_fs;
 
     use crate::processing::ProcessContextBuilder;
-    use crate::test_utils::byte_stream_from_fs;
 
     use super::*;
 

@@ -2,7 +2,7 @@ use std::path;
 
 use clap::Parser;
 
-use processing::io::async_read_to_stream;
+use streaming::async_read_to_stream;
 use processing::process_rusty_stream;
 use processing::processing::ProcessType;
 

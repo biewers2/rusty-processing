@@ -1,7 +1,7 @@
 use std::io::Write;
 use tempfile::TempPath;
-use crate::io::temp_path;
 use crate::processing::ProcessType;
+use crate::temp_path;
 
 /// A workspace quickly creates a set of files that can be used when operating on a file.
 ///

@@ -6,9 +6,11 @@
 //!
 #![warn(missing_docs)]
 
+use lazy_static::lazy_static;
+use tempfile::NamedTempFile;
 use tokio::sync::mpsc::{Receiver, Sender};
 use services::{ArchiveBuilder, ArchiveEntry};
-use crate::io::{async_read_to_stream, ByteStream, runtime};
+use streaming::{async_read_to_stream, ByteStream};
 use crate::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessType};
 
 /// Contains the core logic and interface for processing files.
@@ -16,10 +18,6 @@ use crate::processing::{ProcessContextBuilder, processor, ProcessOutput, Process
 /// Provides the all-purpose processor that can be used to process all implemented file types.
 ///
 pub mod processing;
-
-/// Contains I/O related functionality.
-///
-pub mod io;
 
 pub(crate) mod application {
     #[cfg(feature = "mail")]
@@ -35,6 +33,25 @@ pub(crate) mod message {
 }
 
 pub(crate) mod workspace;
+
+lazy_static! {
+    static ref RUNTIME: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to create tokio runtime");
+}
+
+/// Global asynchronous runtime.
+///
+pub fn runtime() -> &'static tokio::runtime::Runtime {
+    &RUNTIME
+}
+
+/// Creates a temporary file and returns its path.
+///
+pub fn temp_path() -> anyhow::Result<tempfile::TempPath> {
+    Ok(NamedTempFile::new()?.into_temp_path())
+}
 
 /// Process a stream of bytes.
 ///
@@ -188,47 +205,4 @@ async fn build_archive(mut entries: Receiver<ArchiveEntry>) -> anyhow::Result<st
         archive_builder.append(archive_path).await?;
     }
     archive_builder.build()
-}
-
-#[cfg(test)]
-pub mod test_utils {
-    use std::io::Read;
-    use std::path;
-    use bytes::Bytes;
-    use rand::Rng;
-    use tokio::io::AsyncReadExt;
-    use crate::io::ByteStream;
-
-    pub fn read_contents(path: &str) -> anyhow::Result<Vec<u8>> {
-        let mut content = vec![];
-        std::fs::File::open(path::PathBuf::from(path))?.read_to_end(&mut content)?;
-        Ok(content)
-    }
-
-    pub fn byte_stream_from_string(value: impl Into<String>) -> ByteStream {
-        let bytes = Bytes::from(value.into());
-        Box::pin(async_stream::stream! { yield bytes })
-    }
-
-    pub async fn byte_stream_from_fs(path: path::PathBuf) -> anyhow::Result<ByteStream> {
-        let file = tokio::fs::File::open(path).await.unwrap();
-        let mut reader = tokio::io::BufReader::new(file);
-
-        let mut buf = vec![];
-        reader.read_to_end(&mut buf).await?;
-        let bytes = Bytes::from(buf);
-        let stream = Box::pin(async_stream::stream! { yield bytes });
-
-        Ok(stream)
-    }
-
-    pub fn random_bytes(len: usize) -> Box<Vec<u8>> {
-        let mut rng = rand::thread_rng();
-        Box::new((0..len).map(|_| rng.gen()).collect::<Vec<u8>>())
-    }
-
-    pub fn random_byte_stream(len: usize) -> ByteStream {
-        let bytes = Bytes::from(*random_bytes(len));
-        Box::pin(async_stream::stream! { yield bytes })
-    }
 }

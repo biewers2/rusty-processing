@@ -16,7 +16,7 @@ services:
       - temporal-network
 
   apache-tika:
-    image: apache/tika:latest
+    image: apache/tika:latest-full
     volumes:
       - .:/code
     networks:

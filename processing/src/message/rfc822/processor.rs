@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use futures::try_join;
 use mail_parser::{Message, MessageParser, MimeHeaders};
 use serde::{Deserialize, Serialize};
-use identify::deduplication::dedupe_checksum;
 
-use crate::io::ByteStream;
-use crate::io::stream_to_read;
+use identify::deduplication::dedupe_checksum;
+use streaming::{ByteStream, stream_to_read};
+
 use crate::message::rfc822::mimetype;
 use crate::processing::{Process, ProcessContext, ProcessOutput};
 use crate::workspace::Workspace;

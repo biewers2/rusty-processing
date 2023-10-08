@@ -38,7 +38,7 @@ These can be placed in a `.env` file (recommended) or set in the shell environme
 Then run the following commands:
 
 ```bash
-docker build -t file-processing . # To build the Docker image containing the worker binary
+docker build -t rusty-processing-worker . # To build the Docker image containing the worker binary
 docker compose up -d # To start the worker container
 ```
 

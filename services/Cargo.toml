@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "~1.0.75"
+anyhow = { version = "~1.0", features = ["backtrace"] }
+bytes = "1.5"
 bytesize = "1"
 file-format = "0.21"
 futures = "0.3"
@@ -12,8 +13,10 @@ lazy_static = "1.4"
 log = "0.4.20"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 serde_json = "1.0"
+streaming = { version = "0.1", path = "../streaming" }
 zip = { version = "0.6", default-features = false }
 reqwest = { version = "0.11", features = ["stream", "json", "multipart"] }
 tempfile = "3.8"
 tokio = { version = "1.32", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
+tokio-stream = "0.1"

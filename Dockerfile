@@ -1,12 +1,8 @@
 FROM rust:latest AS dependencies
 
 RUN apt-get -y update && \
-    apt-get install -y --no-install-recommends \
-        protobuf-compiler \
-        openjdk-11-jdk-headless
-
-ENV JAVA_HOME /usr/local/openjdk-11
-ENV PATH $JAVA_HOME/bin:$PATH
+    apt-get install -y \
+        protobuf-compiler
 
 FROM dependencies AS builder
 

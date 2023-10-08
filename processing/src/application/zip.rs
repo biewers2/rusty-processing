@@ -11,9 +11,10 @@ use zip::ZipArchive;
 
 use identify::deduplication::dedupe_checksum;
 use identify::mimetype::identify_mimetype;
+use streaming::{ByteStream, stream_to_read};
 
-use crate::io::{ByteStream, stream_to_read, temp_path};
 use crate::processing::{Process, ProcessContext, ProcessOutput};
+use crate::temp_path;
 
 struct ArchiveEntry {
     name: String,

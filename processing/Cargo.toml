@@ -9,7 +9,7 @@ archive = []
 mail = []
 
 [dependencies]
-anyhow = "~1.0.75"
+anyhow = { version = "~1.0", features = ["backtrace"] }
 async-stream = "0.3"
 async-trait = "0.1"
 bytes = "1.5"
@@ -17,14 +17,15 @@ bytesize = "1"
 futures = "0.3"
 html-escape = "0.2.13"
 html2text = "^0.6.0"
+identify = { version = "0.1.0", path = "../identify" }
 json = "0.12.4"
 lazy_static = "~1.4.0"
 mail-parser = "0.9.0"
 md5 = "0.7.0"
 mockall = "~0.11.4"
-identify = { version = "0.1.0", path = "../identify" }
 services = { version = "0.1.0", path = "../services" }
 serde = { version = "~1.0.186", features = ["derive"] }
+streaming = { version = "0.1", path = "../streaming" }
 tempfile = "~3.8.0"
 threadpool = "1.8.1"
 zip = { version = "0.6.6", default-features = false }

@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use crate::io::ByteStream;
+use streaming::ByteStream;
 
 use crate::processing::ProcessContext;
 

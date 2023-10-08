@@ -4,10 +4,9 @@ use std::pin::Pin;
 
 use bytes::Bytes;
 use bytesize::MB;
-use futures::{Stream, StreamExt};
-use lazy_static::lazy_static;
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio_stream::{Stream, StreamExt};
 use tokio_stream::wrappers::ReceiverStream;
 
 /// A representation of a stream of `bytes::Bytes`
@@ -16,21 +15,8 @@ use tokio_stream::wrappers::ReceiverStream;
 ///
 pub type ByteStream = Pin<Box<dyn Stream<Item=Bytes> + Send + Sync>>;
 
-type SyncReader = Box<dyn Read + Send + Unpin>;
-type AsyncReader = Box<dyn AsyncRead + Send + Unpin>;
-
-lazy_static! {
-    static ref RUNTIME: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("Failed to create tokio runtime");
-}
-
-/// Global asynchronous runtime.
-///
-pub fn runtime() -> &'static tokio::runtime::Runtime {
-    &RUNTIME
-}
+pub type SyncReader = Box<dyn Read + Send + Unpin>;
+pub type AsyncReader = Box<dyn AsyncRead + Send + Unpin>;
 
 /// Given an object that's `Read`, create a byte stream to stream bytes from that object.
 ///
@@ -126,6 +112,15 @@ pub async fn stream_to_read(mut stream: ByteStream) -> anyhow::Result<SyncReader
     Ok(Box::new(Cursor::new(data)))
 }
 
+pub async fn stream_to_string(mut stream: ByteStream) -> String {
+    let mut data = String::new();
+    while let Some(bytes) = stream.next().await {
+        let str = String::from_utf8_lossy(bytes.as_ref());
+        data.push_str(&str);
+    }
+    data
+}
+
 /// Stream the remaining content of a byte stream to a file if there's too much data coming in to fill
 /// into memory. `data_read` is the data that was already read from the stream by the caller.
 ///
@@ -143,17 +138,60 @@ async fn stream_remaining_to_file(mut stream: ByteStream, data_read: Vec<u8>) ->
     Ok(Box::new(file))
 }
 
-/// Creates a temporary file and returns its path.
-///
-pub fn temp_path() -> anyhow::Result<tempfile::TempPath> {
-    Ok(NamedTempFile::new()?.into_temp_path())
+#[cfg(test)]
+pub mod test_utils {
+    use std::io::Read;
+    use std::path;
+    use bytes::Bytes;
+    use rand::Rng;
+    use tokio::io::AsyncReadExt;
+
+    use super::*;
+
+    pub fn read_contents(path: &str) -> anyhow::Result<Vec<u8>> {
+        let mut content = vec![];
+        std::fs::File::open(path::PathBuf::from(path))?.read_to_end(&mut content)?;
+        Ok(content)
+    }
+
+    pub fn byte_stream_from_string(value: impl Into<String>) -> ByteStream {
+        let bytes = Bytes::from(value.into());
+        Box::pin(async_stream::stream! { yield bytes })
+    }
+
+    pub async fn byte_stream_from_fs(path: path::PathBuf) -> anyhow::Result<ByteStream> {
+        let file = tokio::fs::File::open(path).await.unwrap();
+        let mut reader = tokio::io::BufReader::new(file);
+
+        let mut buf = vec![];
+        reader.read_to_end(&mut buf).await?;
+        let bytes = Bytes::from(buf);
+        let stream = Box::pin(async_stream::stream! { yield bytes });
+
+        Ok(stream)
+    }
+
+    pub fn random_bytes(len: usize) -> Box<Vec<u8>> {
+        let mut rng = rand::thread_rng();
+        Box::new((0..len).map(|_| rng.gen()).collect::<Vec<u8>>())
+    }
+
+    pub fn random_byte_stream(len: usize) -> (Bytes, ByteStream) {
+        let bytes = Bytes::from(*random_bytes(len));
+        (bytes.clone(), Box::pin(async_stream::stream! { yield bytes }))
+    }
+
+    pub fn string_as_byte_stream(value: impl Into<String>) -> ByteStream {
+        let bytes = Bytes::from(value.into());
+        Box::pin(async_stream::stream! { yield bytes })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
 
-    use crate::test_utils::random_bytes;
+    use crate::test_utils::{random_bytes, string_as_byte_stream};
 
     use super::*;
 
@@ -221,67 +259,13 @@ mod tests {
         Ok(())
     }
 
-    // mod test_stream_reader {
-    //     use crate::test_utils::{byte_stream_from_string, random_byte_stream};
-    //
-    //     use super::*;
-    //
-    //     #[test]
-    //     fn test_read_empty_buffer() -> anyhow::Result<()> {
-    //         let stream = random_byte_stream(10);
-    //         let mut reader = StreamReader::new(stream);
-    //
-    //         let mut empty_buf: [u8; 0] = [];
-    //         assert_eq!(0, reader.read(&mut empty_buf)?);
-    //
-    //         Ok(())
-    //     }
-    //
-    //     #[test]
-    //     fn test_read_smaller_buffer() -> anyhow::Result<()> {
-    //         let text = "this is a stream of bytes from text, and it needs to be 100 characters long abcdefghijklmnopqrstuvwx";
-    //         let text_as_bytes = text.as_bytes();
-    //
-    //         let stream = byte_stream_from_string(text);
-    //         let mut reader = StreamReader::new(stream);
-    //
-    //         let mut buf = [0; 70];
-    //         assert_eq!(70, reader.read(&mut buf)?);
-    //         assert_eq!(text_as_bytes[..70], buf[..]);
-    //         assert_eq!(30, reader.read(&mut buf)?);
-    //         assert_ne!(text_as_bytes[70..], buf[..]);
-    //         assert_eq!(0, reader.read(&mut buf)?);
-    //
-    //         Ok(())
-    //     }
-    //
-    //     #[test]
-    //     fn test_read_larger_buffer() -> anyhow::Result<()> {
-    //         let text = "this is a stream of bytes from text, and it needs to be 100 characters long abcdefghijklmnopqrstuvwx";
-    //         let text_as_bytes = text.as_bytes();
-    //
-    //         let stream = byte_stream_from_string(text);
-    //         let mut reader = StreamReader::new(stream);
-    //
-    //         let mut buf = [0; 120];
-    //         assert_eq!(100, reader.read(&mut buf)?);
-    //         assert_eq!(text_as_bytes[..], buf[..100]);
-    //         assert_eq!([0; 20], buf[100..]);
-    //         assert_eq!(0, reader.read(&mut buf)?);
-    //
-    //         Ok(())
-    //     }
-    //
-    //     #[test]
-    //     fn test_read_no_data() -> anyhow::Result<()> {
-    //         let stream = random_byte_stream(0);
-    //         let mut reader = StreamReader::new(stream);
-    //
-    //         let mut buf = [0; 100];
-    //         assert_eq!(0, reader.read(&mut buf)?);
-    //         assert_eq!([0; 100], buf);
-    //
-    //         Ok(())
-    //     }
-    // }
+    #[tokio::test]
+    async fn test_stream_to_string() {
+        let expected = "Hello, world!";
+        let stream = string_as_byte_stream(expected);
+
+        let string = stream_to_string(stream).await;
+
+        assert_eq!(expected, string);
+    }
 }
