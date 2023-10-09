@@ -1,4 +1,5 @@
-
+use identify::deduplication::dedupe_checksum_from_path;
+use identify::mimetype::identify_mimetype;
 
 struct IdentifyTestCase {
     path: String,
@@ -52,11 +53,9 @@ async fn test_identify() {
 
 fn identify(test_case: IdentifyTestCase) -> tokio::task::JoinHandle<IdentifyAssertion> {
     tokio::spawn(async move {
-        let file = tokio::fs::File::open(&test_case.path).await.unwrap();
-        let mimetype = identify::mimetype::identify_mimetype(file).await.unwrap();
-
-        let file = tokio::fs::File::open(&test_case.path).await.unwrap();
-        let checksum = identify::deduplication::dedupe_checksum(file, &mimetype).await.unwrap();
+        let mimetype = identify_mimetype(&test_case.path).await.unwrap()
+            .unwrap_or("application/octet-stream".to_string());
+        let checksum = dedupe_checksum_from_path(&test_case.path, &mimetype).await.unwrap();
 
         IdentifyAssertion {
             checksum: (checksum, test_case.expected_checksum),

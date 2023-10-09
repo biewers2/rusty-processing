@@ -1,8 +1,9 @@
+use std::path::Path;
+
 use file_format::FileFormat;
 use log::info;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 
-use services::tika;
+use services::{tika, xdg_mime};
 
 /// Identifies the mimetype of a file.
 ///
@@ -14,39 +15,37 @@ use services::tika;
 ///
 /// The mimetype of the file.
 ///
-pub async fn identify_mimetype<R>(mut content: R) -> anyhow::Result<Option<String>>
-    where R: AsyncRead + AsyncSeek + Send + Sync + Unpin + 'static
-{
-    if let Some(mimetype) = identify_using_file_format(&mut content).await? {
-        info!("Identified mimetype as '{}' using file format", mimetype);
+pub async fn identify_mimetype(path: impl AsRef<Path>) -> anyhow::Result<Option<String>> {
+    if let Some(mimetype) = identify_using_xdg_mime(&path).await? {
+        info!("Identified mimetype as '{}' using 'xdg-mime'", mimetype);
         return Ok(Some(mimetype));
     }
 
-    content.rewind().await?;
-    if let Some(mimetype) = identify_using_tika(content).await? {
+    if let Some(mimetype) = identify_using_tika(&path).await? {
         info!("Identified mimetype as '{}' using Tika", mimetype);
+        return Ok(Some(mimetype));
+    }
+
+    if let Some(mimetype) = identify_using_file_format(&path).await? {
+        info!("Identified mimetype as '{}' using file format", mimetype);
         return Ok(Some(mimetype));
     }
 
     Ok(None)
 }
 
-async fn identify_using_file_format<R>(content: &mut R) -> anyhow::Result<Option<String>>
-    where R: AsyncRead + Send + Sync + Unpin + 'static
-{
-    let mut buf = Vec::new();
-    content.read_to_end(&mut buf).await?;
+async fn identify_using_xdg_mime(path: impl AsRef<Path>) -> anyhow::Result<Option<String>> {
+    let mimetype = xdg_mime().query_filetype(path).await?;
+    Ok((mimetype != "application/octet-stream" && mimetype != "text/plain").then_some(mimetype))
+}
 
-    let format = FileFormat::from_bytes(&buf);
-
-    let mimetype = format.media_type().to_string();
+async fn identify_using_tika(path: impl AsRef<Path>) -> anyhow::Result<Option<String>> {
+    let mimetype = tika().detect(path).await?;
     Ok((mimetype != "application/octet-stream").then_some(mimetype))
 }
 
-async fn identify_using_tika<R>(content: R) -> anyhow::Result<Option<String>>
-    where R: AsyncRead + Send + Sync + Unpin + 'static
-{
-    let mimetype = tika().detect(content).await?;
+async fn identify_using_file_format(path: impl AsRef<Path>) -> anyhow::Result<Option<String>> {
+    let mimetype = FileFormat::from_file(path)?.media_type().to_string();
     Ok((mimetype != "application/octet-stream").then_some(mimetype))
 }
 
@@ -56,9 +55,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_detect_mimetype() -> anyhow::Result<()> {
-        let file = tokio::fs::File::open("../resources/mbox/ubuntu-no-small.mbox").await?;
-        let reader = tokio::io::BufReader::new(file);
-        let mimetype = identify_mimetype(reader).await?;
+        let path = "../resources/mbox/ubuntu-no-small.mbox";
+
+        let mimetype = identify_mimetype(path).await?;
+
         assert!(mimetype.is_some());
         assert_eq!(mimetype.unwrap(), "application/mbox");
         Ok(())

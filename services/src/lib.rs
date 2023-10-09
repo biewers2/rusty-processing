@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 use std::fmt;
 use std::fmt::Formatter;
+use std::io::Cursor;
 use std::ops::{Deref, DerefMut};
 use std::process::{ExitStatus, Stdio};
 
@@ -14,55 +15,60 @@ mod config;
 mod html_to_pdf;
 mod pdf_to_image;
 mod tika;
+mod xdg_mime;
 
 pub use archive_builder::*;
 pub use config::*;
 pub use html_to_pdf::*;
 pub use pdf_to_image::*;
 pub use tika::*;
+pub use xdg_mime::*;
+
+pub(crate) fn no_reader() -> Option<Cursor<Vec<u8>>> { None }
+
+pub(crate) fn no_writer() -> Option<Vec<u8>> { None }
 
 /// Error type for when a command execution fails.
 ///
 #[derive(Debug, Clone)]
-pub struct CommandError<E = Error> {
-    /// The exit status of the command, if it was able to complete.
-    ///
-    pub status: Option<ExitStatus>,
-
-    /// The underlying error that occurred while executing the command.
-    ///
-    pub error: E,
+pub enum CommandError<E = Error> {
+    PreExit(E),
+    PostExit(ExitStatus, E),
 }
 
 impl CommandError {
-    pub fn pre_exit(error: impl Into<Error>) -> Self {
-        Self {
-            status: None,
-            error: error.into(),
-        }
+    pub fn pre_exit(err: impl Into<Error>) -> Self {
+        CommandError::PreExit(err.into())
     }
 
-    pub fn post_exit(status: ExitStatus, error: impl Into<Error>) -> Self {
-        Self {
-            status: Some(status),
-            error: error.into(),
-        }
+    pub fn post_exit(status: ExitStatus, err: impl Into<Error>) -> Self {
+        CommandError::PostExit(status, err.into())
     }
 }
 
 impl fmt::Display for CommandError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let code = self.status
-            .and_then(|status| status.code())
-            .map(|code| format!(" (code {})", code))
-            .unwrap_or("".to_string());
-        write!(f, "{}{}", self.error, code)
+        let (code, error) = match self {
+            CommandError::PreExit(err) => ("".to_string(), err),
+            CommandError::PostExit(status, err) => (
+                status.code()
+                    .map(|code| format!(" (code {})", code))
+                    .unwrap_or("".to_string()),
+                err
+            )
+        };
+
+        write!(f, "{}{}", error, code)
     }
 }
 
 impl std::error::Error for CommandError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(self.error.as_ref())
+        let error = match self {
+            CommandError::PreExit(err) => err,
+            CommandError::PostExit(_, err) => err,
+        };
+        Some(error.as_ref())
     }
 }
 
@@ -115,9 +121,9 @@ where
 pub(crate) async fn stream_command<R, W, E>(
     program: impl AsRef<str>,
     arguments: impl IntoIterator<Item=impl AsRef<OsStr>>,
-    mut input: R,
-    mut output: W,
-    mut error: E,
+    input: Option<R>,
+    output: Option<W>,
+    error: Option<E>,
 ) -> Result<ExitStatus, CommandError>
     where
         R: AsyncRead + Unpin,
@@ -133,9 +139,9 @@ pub(crate) async fn stream_command<R, W, E>(
         .spawn()
         .map_err(CommandError::pre_exit)?;
 
-    let writing = transfer(Some(&mut input), proc.stdin.take());
-    let reading = transfer(proc.stdout.take(), Some(&mut output));
-    let erroring = transfer(proc.stderr.take(), Some(&mut error));
+    let writing = transfer(input, proc.stdin.take());
+    let reading = transfer(proc.stdout.take(), output);
+    let erroring = transfer(proc.stderr.take(), error);
 
     // Don't `try_join!` to allow the error buffer to be written to completion
     let (writing_res, reading_res, erroring_res) = join!(writing, reading, erroring);
@@ -186,7 +192,7 @@ mod test_utils {
 mod tests {
     use std::io::Cursor;
 
-    use crate::{stream_command, trim_to_string};
+    use crate::{CommandError, stream_command, trim_to_string};
 
     fn buffers(data: &[u8]) -> (Cursor<Vec<u8>>, Vec<u8>, Vec<u8>) {
         let input = Cursor::new(data.to_vec());
@@ -202,9 +208,9 @@ mod tests {
         let result = stream_command(
             "cat",
             Vec::<&str>::new(),
-            &mut input,
-            &mut output,
-            &mut error,
+            Some(&mut input),
+            Some(&mut output),
+            Some(&mut error),
         ).await;
 
         assert!(result.is_ok());
@@ -223,16 +229,18 @@ mod tests {
         let result = stream_command(
             "commandthatdoesntexist",
             vec!["random", "arguments"],
-            &mut input,
-            &mut output,
-            &mut error,
+            Some(&mut input),
+            Some(&mut output),
+            Some(&mut error),
         ).await;
 
         assert!(result.is_err());
         let command_err = result.unwrap_err();
-        assert!(command_err.status.is_none());
-        assert_eq!(command_err.error.to_string(), "No such file or directory (os error 2)");
-
+        if let CommandError::PreExit(err) = command_err {
+            assert_eq!(err.to_string(), "No such file or directory (os error 2)");
+        } else {
+            panic!("expected pre-exit error");
+        }
         assert!(output.is_empty());
         assert!(error.is_empty());
     }
@@ -244,16 +252,19 @@ mod tests {
         let result = stream_command(
             "ls",
             vec!["-abcde"],
-            &mut input,
-            &mut output,
-            &mut error,
+            Some(&mut input),
+            Some(&mut output),
+            Some(&mut error),
         ).await;
 
         assert!(result.is_err());
         let command_err = result.unwrap_err();
-        assert!(command_err.status.is_some());
-        assert_eq!(command_err.status.unwrap().code(), Some(2));
-        assert!(!command_err.error.to_string().is_empty());
+        if let CommandError::PostExit(status, err) = command_err {
+            assert_eq!(status.code(), Some(2));
+            assert_eq!(err.to_string(), "Broken pipe (os error 32)");
+        } else {
+            panic!("expected post-exit error");
+        }
 
         let error = trim_to_string(&error);
         assert!(output.is_empty());
@@ -267,16 +278,19 @@ mod tests {
         let result = stream_command(
             "bash",
             vec!["-c", "exit 13"],
-            &mut input,
-            &mut output,
-            &mut error,
+            Some(&mut input),
+            Some(&mut output),
+            Some(&mut error),
         ).await;
 
         assert!(result.is_err());
         let command_err = result.unwrap_err();
-        assert!(command_err.status.is_some());
-        assert_eq!(command_err.status.unwrap().code(), Some(13));
-        assert_eq!(command_err.error.to_string(), "command failed with non-zero exit status");
+        if let CommandError::PostExit(status, err) = command_err {
+            assert_eq!(status.code(), Some(13));
+            assert_eq!(err.to_string(), "command failed with non-zero exit status");
+        } else {
+            panic!("expected post-exit error");
+        }
 
         assert!(output.is_empty());
         assert!(error.is_empty());

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tempfile::TempPath;
 use zip::ZipArchive;
 
-use identify::deduplication::dedupe_checksum;
+use identify::deduplication::dedupe_checksum_from_path;
 use identify::mimetype::identify_mimetype;
 use streaming::{ByteStream, stream_to_read};
 
@@ -48,11 +48,8 @@ where R: Read + Seek
         (name, emb_path)
     };
 
-    let emb_file = tokio::fs::File::open(&path).await?;
-    let mimetype = identify_mimetype(emb_file).await?.unwrap_or("application/octet-stream".to_string());
-
-    let emb_file = tokio::fs::File::open(&path).await?;
-    let checksum = dedupe_checksum(emb_file, &mimetype).await?;
+    let mimetype = identify_mimetype(&path).await?.unwrap_or("application/octet-stream".to_string());
+    let checksum = dedupe_checksum_from_path(&path, &mimetype).await?;
 
     Ok(NextArchiveEntry::File(ArchiveEntry { name, path, dedupe_checksum: checksum, mimetype }))
 }

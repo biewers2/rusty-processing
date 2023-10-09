@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::path::Path;
 
 use anyhow::anyhow;
 use futures::StreamExt;
@@ -48,11 +49,10 @@ impl Tika {
             .is_ok()
     }
 
-    pub async fn text<R>(&self, input: R) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)>
-        where R: AsyncRead + Send + Sync + Unpin + 'static
-    {
+    pub async fn text(&self, path: impl AsRef<Path>) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)> {
         info!("Using Tika to extract text");
 
+        let input = tokio::fs::File::open(path).await?;
         let response = self.http_client
             .put(self.url("/tika"))
             .header("Accept", "text/plain")
@@ -74,11 +74,10 @@ impl Tika {
         Ok((stream, reading))
     }
 
-    pub async fn metadata<R>(&self, input: R) -> anyhow::Result<String>
-        where R: AsyncRead + Send + Sync + Unpin + 'static
-    {
+    pub async fn metadata(&self, path: impl AsRef<Path>) -> anyhow::Result<String> {
         info!("Using Tika to extract metadata");
 
+        let input = tokio::fs::File::open(path).await?;
         let response = self.http_client
             .put(self.url("/meta"))
             .header("Accept", "application/json")
@@ -100,11 +99,10 @@ impl Tika {
     ///
     /// The mimetype of the input file.
     ///
-    pub async fn detect<R>(&self, input: R) -> anyhow::Result<String>
-        where R: AsyncRead + Send + Sync + Unpin + 'static
-    {
+    pub async fn detect(&self, path: impl AsRef<Path>) -> anyhow::Result<String> {
         info!("Using Tika to detect mimetype");
 
+        let input = tokio::fs::File::open(path).await?;
         let response = self.http_client
             .put(self.url("/meta/Content-Type"))
             .header("Accept", "application/json")

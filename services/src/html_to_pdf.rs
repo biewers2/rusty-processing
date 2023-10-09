@@ -40,7 +40,7 @@ pub struct HtmlToPdfOutput {
 }
 
 #[derive(Default)]
-pub struct HtmlToPdf {}
+pub struct HtmlToPdf;
 
 impl HtmlToPdf {
     pub async fn run<R, W>(&self, mut input: R, mut output: W) -> anyhow::Result<HtmlToPdfOutput>
@@ -52,9 +52,9 @@ impl HtmlToPdf {
         let exit_value = stream_command(
             PROGRAM,
             &DEFAULT_ARGS,
-            &mut input,
-            &mut output,
-            &mut error
+            Some(&mut input),
+            Some(&mut output),
+            Some(&mut error),
         ).await?;
 
         Ok(HtmlToPdfOutput {

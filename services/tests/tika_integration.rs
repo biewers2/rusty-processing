@@ -36,37 +36,32 @@ Backflush w/ cleaner
 
 
 ";
+    let path = "../resources/pdf/Espresso Machine Cleaning Guide.pdf";
 
-    let input_path = "../resources/pdf/Espresso Machine Cleaning Guide.pdf";
-    let file = tokio::fs::File::open(input_path).await?;
+    let (stream, streaming) = tika().text(path).await?;
 
-    let (stream, streaming) = tika().text(file).await?;
     let streaming = tokio::spawn(streaming);
-
     let text = stream_to_string(stream).await;
     streaming.await??;
-
     assert_eq!(text, expected_text);
     Ok(())
 }
 
 #[tokio::test]
 async fn test_tika_text_with_ocr() -> anyhow::Result<()> {
-    let input_path = "../resources/jpg/jQuery-text.jpg";
-    let file = tokio::fs::File::open(input_path).await?;
+    let path = "../resources/jpg/jQuery-text.jpg";
 
-    let (stream, streaming) = tika().text(file).await?;
+    let (stream, streaming) = tika().text(path).await?;
+
     let streaming = tokio::spawn(streaming);
-
     let text = stream_to_string(stream).await;
     streaming.await??;
-
     assert_eq!(text, "jQuery $%&U6~\n\n\n");
     Ok(())
 }
 
 #[tokio::test]
-async fn test_tika_metadata() -> anyhow::Result<()> {
+async fn test_tika_metadata() {
     let expected_metadata = "\
 {\
 \"X-TIKA:Parsed-By\":[\"org.apache.tika.parser.DefaultParser\",\"org.apache.tika.parser.mbox.MboxParser\"],\
@@ -75,21 +70,18 @@ async fn test_tika_metadata() -> anyhow::Result<()> {
 \"language\":\"\",\
 \"Content-Type\":\"application/mbox\"\
 }";
+    let path = "../resources/mbox/ubuntu-no-small.mbox";
 
-    let input_path = "../resources/mbox/ubuntu-no-small.mbox";
-    let file = tokio::fs::File::open(input_path).await?;
-
-    let metadata = tika().metadata(file).await?;
+    let metadata = tika().metadata(path).await.unwrap();
 
     assert_eq!(metadata, expected_metadata);
-    Ok(())
 }
 
 #[tokio::test]
 async fn test_tika_detect() {
-    let input_path = "../resources/zip/testzip.zip";
-    let file = tokio::fs::File::open(input_path).await.unwrap();
+    let path = "../resources/zip/testzip.zip";
 
-    let mimetype = tika().detect(file).await.unwrap();
+    let mimetype = tika().detect(path).await.unwrap();
+
     assert_eq!(mimetype, "application/zip");
 }

@@ -46,9 +46,9 @@ impl PdfToImage {
         let exit_status = stream_command(
             PROGRAM,
             &DEFAULT_ARGS,
-            &mut input,
-            &mut output,
-            &mut error,
+            Some(&mut input),
+            Some(&mut output),
+            Some(&mut error),
         ).await?;
 
         Ok(PdfToImageOutput {
