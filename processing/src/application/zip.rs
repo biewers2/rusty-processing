@@ -49,7 +49,7 @@ where R: Read + Seek
     };
 
     let emb_file = tokio::fs::File::open(&path).await?;
-    let mimetype = identify_mimetype(emb_file).await?;
+    let mimetype = identify_mimetype(emb_file).await?.unwrap_or("application/octet-stream".to_string());
 
     let emb_file = tokio::fs::File::open(&path).await?;
     let checksum = dedupe_checksum(emb_file, &mimetype).await?;

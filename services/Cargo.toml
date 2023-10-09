@@ -7,7 +7,6 @@ edition = "2021"
 anyhow = { version = "~1.0", features = ["backtrace"] }
 bytes = "1.5"
 bytesize = "1"
-# file-format = "0.21" TODO | integrate into `identify_mimetype`
 futures = { version = "0.3", features = ["std", "executor"] }
 lazy_static = "1.4"
 log = "0.4"

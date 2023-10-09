@@ -26,7 +26,7 @@ services = { version = "0.1", path = "../services" }
 serde = { version = "1.0", features = ["derive"] }
 streaming = { version = "0.1", path = "../streaming" }
 tempfile = "3.8"
-tokio = { version = "1.32" }
+tokio = { version = "1.32", features = ["rt-multi-thread"] }
 threadpool = "1.8"
 zip = { version = "0.6" }
 
