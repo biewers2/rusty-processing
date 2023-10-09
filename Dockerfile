@@ -10,7 +10,10 @@ RUN apt-get -y update && \
         ghostscript \
         pkg-config \
         ./libssl1.1.deb \
-        ./wkhtmltox.deb
+        ./wkhtmltox.deb && \
+    \
+    rm ./libssl1.1.deb ./wkhtmltox.deb
+
 
 FROM dependencies AS builder
 
@@ -20,5 +23,6 @@ RUN cargo build --release
 
 FROM dependencies
 
+COPY --from=builder /app/target/release/cli /usr/local/bin/cli
 COPY --from=builder /app/target/release/temporal-worker /usr/local/bin/temporal-worker
 CMD ["temporal-worker"]

@@ -2,6 +2,7 @@ use std::io::{BufReader, Cursor};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
+use log::{info, warn};
 use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
 use identify::deduplication::dedupe_checksum;
@@ -21,7 +22,7 @@ pub struct MboxProcessor;
 impl MboxProcessor {
     /// Writes a message to the output directory.
     ///
-    async fn write_message(&self, ctx: &ProcessContext, message: Message) -> anyhow::Result<ProcessOutput> {
+    async fn process_message(&self, ctx: &ProcessContext, message: Message) -> anyhow::Result<ProcessOutput> {
         let contents = message.unwrap_contents();
 
         let mimetype = "message/rfc822";
@@ -44,15 +45,25 @@ impl MboxProcessor {
 #[async_trait]
 impl Process for MboxProcessor {
     async fn process(&self, ctx: ProcessContext, content: ByteStream) -> anyhow::Result<()> {
+        info!("Reading mbox into iterator");
         let reader = BufReader::new(stream_to_read(content).await?);
         let message_iter = MessageIterator::new(reader);
 
+        info!("Processing embedded messages");
         for message_res in message_iter {
-            let message = message_res.map_err(|err| anyhow!("failed to parse message from mbox: {:?}", err))?;
-            let result = self.write_message(&ctx, message).await;
+            let message = message_res.map_err(|err| {
+                let msg = format!("failed to parse message from mbox: {:?}", err);
+                warn!("{}", msg);
+                anyhow!(msg)
+            })?;
+            let result = self.process_message(&ctx, message).await;
             ctx.add_output(result).await?;
         }
         Ok(())
+    }
+
+    fn name(&self) -> &'static str {
+        "mbox"
     }
 }
 

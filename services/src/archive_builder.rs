@@ -1,12 +1,12 @@
 use std::fs::File;
 use std::io::{Seek, Write};
 use std::path;
-use anyhow::anyhow;
 use bytesize::MB;
 use tempfile::TempPath;
 
 use tokio::io::AsyncReadExt;
 
+#[derive(Debug)]
 pub struct ArchiveEntry {
     name: String,
     path: TempPath,
@@ -68,9 +68,7 @@ impl ArchiveBuilder {
             if bytes_read == 0 {
                 break;
             }
-            if self.zipper.write(&buf[..bytes_read])? == 0 {
-                return Err(anyhow!("ZIP writer unexpectedly closed"));
-            }
+            self.zipper.write_all(&buf[..bytes_read])?;
         }
         Ok(())
     }

@@ -18,8 +18,6 @@ pub async fn identify_mimetype(content: impl AsyncRead + Send + Sync + Unpin + '
 
 #[cfg(test)]
 mod tests {
-    
-    
     use super::*;
 
     #[tokio::test]

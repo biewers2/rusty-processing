@@ -3,6 +3,7 @@ use std::future::Future;
 use anyhow::anyhow;
 use futures::StreamExt;
 use lazy_static::lazy_static;
+use log::{debug, info};
 use reqwest::Body;
 use tokio::io::AsyncRead;
 use tokio_stream::wrappers::ReceiverStream;
@@ -50,12 +51,15 @@ impl Tika {
     pub async fn text<R>(&self, input: R) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)>
         where R: AsyncRead + Send + Sync + Unpin + 'static
     {
+        info!("Using Tika to extract text");
+
         let response = self.http_client
             .put(self.url("/tika"))
             .header("Accept", "text/plain")
             .header("X-Tika-Skip-Embedded", "true")
             .body(Self::body_from_input(input))
             .send().await?;
+        debug!("Tika responded with {}", response.status());
 
         let (sink, stream) = tokio::sync::mpsc::channel(100);
         let reading = async move {
@@ -73,12 +77,16 @@ impl Tika {
     pub async fn metadata<R>(&self, input: R) -> anyhow::Result<String>
         where R: AsyncRead + Send + Sync + Unpin + 'static
     {
+        info!("Using Tika to extract metadata");
+
         let response = self.http_client
             .put(self.url("/meta"))
             .header("Accept", "application/json")
             .header("X-Tika-Skip-Embedded", "true")
             .body(Self::body_from_input(input))
             .send().await?;
+        debug!("Tika responded with {}", response.status());
+
         Ok(response.text().await?)
     }
 
@@ -95,14 +103,20 @@ impl Tika {
     pub async fn detect<R>(&self, input: R) -> anyhow::Result<String>
         where R: AsyncRead + Send + Sync + Unpin + 'static
     {
+        info!("Using Tika to detect mimetype");
+
         let response = self.http_client
             .put(self.url("/meta/Content-Type"))
             .header("Accept", "application/json")
             .header("X-Tika-Skip-Embedded", "true")
             .body(Self::body_from_input(input))
             .send().await?;
-        let mimetype = self.parse_detect_response(response).await?;
-        Ok(mimetype)
+        debug!("Tika responded with {}", response.status());
+
+        let mimetype = self.parse_detect_response(response).await;
+        debug!("Response body result: {:?}", mimetype);
+
+        mimetype
     }
 
     #[inline]

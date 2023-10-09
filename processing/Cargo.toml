@@ -19,6 +19,7 @@ html2text = "0.6"
 identify = { version = "0.1", path = "../identify" }
 json = "0.12"
 lazy_static = "1.4"
+log = "0.4"
 mail-parser = "0.9"
 mockall = "0.11"
 services = { version = "0.1", path = "../services" }
@@ -27,7 +28,7 @@ streaming = { version = "0.1", path = "../streaming" }
 tempfile = "3.8"
 tokio = { version = "1.32" }
 threadpool = "1.8"
-zip = { version = "0.6", default-features = false }
+zip = { version = "0.6" }
 
 [dev-dependencies]
 pretty_assertions = "1.4"

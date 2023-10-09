@@ -7,6 +7,7 @@
 #![warn(missing_docs)]
 
 use lazy_static::lazy_static;
+use log::{debug, info, warn};
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc::{Receiver, Sender};
 use services::{ArchiveBuilder, ArchiveEntry};
@@ -33,6 +34,10 @@ pub(crate) mod message {
 }
 
 pub(crate) mod workspace;
+
+/// The number of threads to use for handling outputs.
+///
+const OUTPUT_HANDLING_THREADS: usize = 1000;
 
 lazy_static! {
     static ref RUNTIME: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
@@ -76,11 +81,14 @@ pub async fn process_rusty_stream(
     types: Vec<ProcessType>,
     recurse: bool,
 ) -> anyhow::Result<tokio::fs::File> {
+    let mimetype = mimetype.into();
+    info!("Processing stream with MIME type {}", mimetype);
+
     let (output_sink, outputs) = tokio::sync::mpsc::channel(100);
     let (archive_entry_sink, archive_entries) = tokio::sync::mpsc::channel(100);
 
     let ctx = ProcessContextBuilder::new(
-        mimetype.into(),
+        mimetype,
         types,
         output_sink,
     ).build();
@@ -95,6 +103,7 @@ pub async fn process_rusty_stream(
 
     processing.await??;
     output_handling.await??;
+    info!("Finished processing stream");
 
     let file = archive.await??;
     Ok(tokio::fs::File::from(file))
@@ -112,7 +121,7 @@ async fn handle_outputs(
     archive_entry_sink: Sender<ArchiveEntry>,
     recurse: bool,
 ) -> anyhow::Result<()> {
-    let worker_pool = threadpool::ThreadPool::new(100);
+    let worker_pool = threadpool::ThreadPool::new(OUTPUT_HANDLING_THREADS);
 
     while let Some(output) = outputs.recv().await {
         match output {
@@ -122,7 +131,7 @@ async fn handle_outputs(
                     handle_output_asynchronously(output, recurse, archive_entry_sink)
                 ));
             },
-            Err(e) => { eprintln!("Error processing: {:?}", e); },
+            Err(e) => { warn!("Error processing: {:?}", e); },
         };
     }
 
@@ -144,7 +153,7 @@ async fn handle_output_asynchronously(output: ProcessOutput, recurse: bool, arch
 
     match archive_entry {
         Ok(archive_entry) => archive_entry_sink.send(archive_entry).await.unwrap(),
-        Err(e) => eprintln!("Error processing: {:?}", e),
+        Err(e) => warn!("Error processing: {:?}", e),
     }
 }
 
@@ -172,8 +181,13 @@ async fn handle_process_output_recursively(output: ProcessOutput) -> anyhow::Res
             let (emb_stream, emb_read_fut) = async_read_to_stream(file) ?;
             let emb_read_fut = tokio::spawn(emb_read_fut);
 
-            processor().process(ctx, emb_stream).await?;
-            emb_read_fut.await??;
+            match processor().process(ctx, emb_stream).await {
+                Ok(_) => emb_read_fut.await??,
+                Err(e) => {
+                    warn!("Error processing: {:?}", e);
+                    let _ = emb_read_fut.await?; // Channel will close due to error, ignore it.
+                }
+            };
 
             Ok(ArchiveEntry::new(data.name, data.path, id_chain))
         }
@@ -202,6 +216,7 @@ async fn handle_process_output(output: ProcessOutput) -> anyhow::Result<ArchiveE
 async fn build_archive(mut entries: Receiver<ArchiveEntry>) -> anyhow::Result<std::fs::File> {
     let mut archive_builder = ArchiveBuilder::new()?;
     while let Some(archive_path) = entries.recv().await {
+        debug!("Adding archive entry {:?}", archive_path);
         archive_builder.append(archive_path).await?;
     }
     archive_builder.build()

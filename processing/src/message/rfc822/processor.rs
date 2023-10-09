@@ -132,4 +132,8 @@ impl Process for Rfc822Processor {
 
         Ok(())
     }
+
+    fn name(&self) -> &'static str {
+        "RFC 822"
+    }
 }

@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use lazy_static::lazy_static;
+use log::info;
 use serde::{Deserialize, Serialize};
 use streaming::ByteStream;
 
@@ -30,6 +31,10 @@ pub trait Process: Send + Sync {
     /// * `content` - Async reader of the raw bytes to process.
     ///
     async fn process(&self, ctx: ProcessContext, stream: ByteStream) -> anyhow::Result<()>;
+
+    /// Returns the name of the processor.
+    ///
+    fn name(&self) -> &'static str;
 }
 
 
@@ -58,7 +63,10 @@ impl Processor {
         ctx: ProcessContext,
         stream: ByteStream,
     ) -> anyhow::Result<()> {
-        self.processor(&ctx.mimetype)?.process(ctx, stream).await
+        let processor = self.processor(&ctx.mimetype)?;
+
+        info!("Processing {} with {}", ctx.mimetype, processor.name());
+        processor.process(ctx, stream).await
     }
 
     fn processor(&self, mimetype: &str) -> anyhow::Result<Box<dyn Process>> {

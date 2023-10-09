@@ -10,5 +10,11 @@
     "files": [
       "../resources/rfc822/headers-small.eml"
     ]
+  },
+  {
+    "mimetype": "application/zip",
+    "files": [
+      "../resources/zip/testzip.zip"
+    ]
   }
 ]

@@ -2,6 +2,7 @@ use std::io::Cursor;
 use std::ops::{Deref, DerefMut};
 
 use bytesize::MB;
+use log::info;
 use mail_parser::MessageParser;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
@@ -27,6 +28,7 @@ where R: AsyncRead + Send + Sync + Unpin
         "message/rfc822" => dedupe_message(content).await,
         _ => dedupe_md5(content).await,
     }?;
+    info!("Calculated dedupe checksum: {}", checksum);
     Ok(checksum)
 }
 
