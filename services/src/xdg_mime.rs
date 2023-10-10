@@ -52,7 +52,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_xdg_mime_singleton() {
+    fn check_singleton() {
         assert_eq!(xdg_mime().type_id(), TypeId::of::<Box<XdgMime>>());
     }
 

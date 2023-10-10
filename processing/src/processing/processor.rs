@@ -65,7 +65,7 @@ impl Processor {
     ) -> anyhow::Result<()> {
         let processor = self.processor(&ctx.mimetype)?;
 
-        info!("Processing {} with {}", ctx.mimetype, processor.name());
+        info!("Processing {} with processor {}", ctx.mimetype, processor.name());
         processor.process(ctx, stream).await
     }
 

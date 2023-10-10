@@ -25,7 +25,6 @@ pub async fn dedupe_checksum_from_path(path: impl AsRef<Path>, mimetype: impl As
         "message/rfc822" => dedupe_message_from_path(path).await,
         _ => dedupe_md5_from_path(path).await,
     }?;
-    info!("Calculated dedupe checksum: {}", checksum);
     Ok(checksum)
 }
 
@@ -47,7 +46,6 @@ pub async fn dedupe_checksum(content: &mut (impl AsyncRead + Unpin), mimetype: i
         "message/rfc822" => dedupe_message(content).await,
         _ => dedupe_md5(content).await,
     }?;
-    info!("Calculated dedupe checksum: {}", checksum);
     Ok(checksum)
 }
 

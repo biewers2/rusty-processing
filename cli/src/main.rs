@@ -49,7 +49,7 @@ fn parse_input_file(path_str: &str) -> Result<path::PathBuf, String> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    simple_logger::init_with_level(log::Level::Debug)?;
+    simple_logger::init_with_level(log::Level::Info)?;
 
     let args = Args::parse();
     let types = if args.all {

@@ -9,6 +9,7 @@ RUN apt-get -y update && \
         protobuf-compiler \
         ghostscript \
         pkg-config \
+        xdg-utils \
         ./libssl1.1.deb \
         ./wkhtmltox.deb && \
     \

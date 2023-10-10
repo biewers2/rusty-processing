@@ -73,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn check_pdf_to_img_singleton() {
+    fn check_singleton() {
         assert_eq!(pdf_to_image().type_id(), TypeId::of::<Box<PdfToImage>>());
     }
 

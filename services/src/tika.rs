@@ -147,7 +147,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_tika_singleton() {
+    fn check_singleton() {
         assert_eq!(tika().type_id(), TypeId::of::<Box<Tika>>());
     }
 

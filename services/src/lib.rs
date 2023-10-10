@@ -135,7 +135,6 @@ pub(crate) async fn stream_command<R, W, E>(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .kill_on_drop(true)
         .spawn()
         .map_err(CommandError::pre_exit)?;
 

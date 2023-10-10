@@ -80,7 +80,7 @@ mod tests {
     }
 
     #[test]
-    fn check_wkhtmltopdf_singleton() {
+    fn check_singleton() {
         assert_eq!(html_to_pdf().type_id(), TypeId::of::<Box<HtmlToPdf>>());
     }
 
