@@ -21,6 +21,8 @@ impl ArchiveEntry {
 
 pub struct ArchiveBuilder {
     zipper: zip::ZipWriter<File>,
+    size: usize,
+    current_path: Option<TempPath>,
 }
 
 impl ArchiveBuilder {
@@ -28,7 +30,11 @@ impl ArchiveBuilder {
         let file = tempfile::tempfile()?;
         let zipper = zip::ZipWriter::new(file);
 
-        Ok(Self { zipper })
+        Ok(Self {
+            zipper,
+            size: 0,
+            current_path: None
+        })
     }
 
     pub async fn append(&mut self, entry: ArchiveEntry) -> anyhow::Result<()> {
@@ -41,10 +47,21 @@ impl ArchiveBuilder {
         self.zipper.add_directory(base_path_string, Default::default())?;
         self.zipper.start_file(path_string, Default::default())?;
         self.write_file(&entry.path).await?;
+
+        self.current_path = Some(entry.path);
+        self.size += 1;
+
         Ok(())
     }
 
     pub fn build(&mut self) -> anyhow::Result<File> {
+        // Return the file if there is only one entry.
+        if self.size == 1 {
+            if let Some(path) = self.current_path.take() {
+                return Ok(File::open(path)?)
+            }
+        }
+
         let mut file = self.zipper.finish()?;
         file.rewind()?;
         Ok(file)

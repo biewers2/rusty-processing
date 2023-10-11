@@ -48,7 +48,7 @@ pub async fn process_rusty_file_activity(
     let (stream, get_object_fut) = async_read_to_stream(get_object.body)?;
     let get_object_fut = tokio::spawn(get_object_fut);
 
-    let archive_file = process_rusty_stream(
+    let resulting_file = process_rusty_stream(
         stream,
         input.mimetype,
         PROCESS_TYPES.to_vec(),
@@ -56,7 +56,7 @@ pub async fn process_rusty_file_activity(
     ).await?;
     get_object_fut.await??;
 
-    upload(archive_file, input.output_s3_uri).await?;
+    upload(resulting_file, input.output_s3_uri).await?;
 
     Ok(ProcessRustyFileOutput {})
 }

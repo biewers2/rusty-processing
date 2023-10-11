@@ -58,15 +58,15 @@ async fn main() -> anyhow::Result<()> {
         args.types
     };
 
-    let file = Box::new(tokio::fs::File::open(&args.input).await?);
-    let (stream, reading) = async_read_to_stream(file)?;
+    let input_file = Box::new(tokio::fs::File::open(&args.input).await?);
+    let (stream, reading) = async_read_to_stream(input_file)?;
     let reading = tokio::spawn(reading);
 
-    let mut archive_file = process_rusty_stream(stream, args.mimetype, types, true).await?;
+    let mut resulting_file = process_rusty_stream(stream, args.mimetype, types, true).await?;
     reading.await??;
 
     let mut output_file = tokio::fs::File::create(args.output).await?;
-    tokio::io::copy(&mut archive_file, &mut output_file).await?;
+    tokio::io::copy(&mut resulting_file, &mut output_file).await?;
 
     Ok(())
 }
