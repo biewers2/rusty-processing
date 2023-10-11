@@ -131,7 +131,7 @@ async fn handle_outputs(
                     handle_output_asynchronously(output, recurse, archive_entry_sink)
                 ));
             },
-            Err(e) => { warn!("Error processing: {:?}", e); },
+            Err(e) => warn!("Error processing: {:?}", e),
         };
     }
 

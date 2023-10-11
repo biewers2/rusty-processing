@@ -19,8 +19,6 @@ services:
 
   apache-tika:
     image: apache/tika:latest-full
-    volumes:
-      - .:/code
     networks:
       - temporal-network
     ports:

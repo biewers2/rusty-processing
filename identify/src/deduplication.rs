@@ -3,7 +3,6 @@ use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
 use bytesize::MB;
-use log::info;
 use mail_parser::MessageParser;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
@@ -88,6 +87,7 @@ async fn dedupe_message(content: &mut (impl AsyncRead + Unpin)) -> anyhow::Resul
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
+
     use crate::deduplication::dedupe_checksum;
 
     #[tokio::test]

@@ -26,6 +26,7 @@ pub use xdg_mime::*;
 
 pub(crate) fn no_reader() -> Option<Cursor<Vec<u8>>> { None }
 
+#[allow(dead_code)]
 pub(crate) fn no_writer() -> Option<Vec<u8>> { None }
 
 /// Error type for when a command execution fails.

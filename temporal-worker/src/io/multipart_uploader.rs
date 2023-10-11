@@ -12,8 +12,8 @@ pub struct MultipartUploader {
 }
 
 impl MultipartUploader {
-    pub fn new(s3_uri: String) -> anyhow::Result<Self> {
-        let (bucket, key) = parse_s3_uri(&s3_uri)?;
+    pub fn new(s3_uri: impl AsRef<str>) -> anyhow::Result<Self> {
+        let (bucket, key) = parse_s3_uri(s3_uri.as_ref())?;
         Ok(Self { bucket, key })
     }
 

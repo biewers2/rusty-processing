@@ -8,7 +8,7 @@ use crate::io::multipart_uploader::MultipartUploader;
 use crate::services::s3_client;
 use crate::util::parse_s3_uri;
 
-pub async fn upload(mut file: tokio::fs::File, output_s3_uri: String) -> anyhow::Result<()> {
+pub async fn upload(mut file: tokio::fs::File, output_s3_uri: impl AsRef<str>) -> anyhow::Result<()> {
     if file.metadata().await?.size() > MB * 10 {
         let uploader = MultipartUploader::new(output_s3_uri)?;
         uploader.upload(&mut file).await
@@ -19,9 +19,9 @@ pub async fn upload(mut file: tokio::fs::File, output_s3_uri: String) -> anyhow:
 
 async fn upload_file(
     mut file: tokio::fs::File,
-    output_s3_uri: String,
+    output_s3_uri: impl AsRef<str>,
 ) -> anyhow::Result<()> {
-    let (bucket, key) = parse_s3_uri(output_s3_uri.as_str())?;
+    let (bucket, key) = parse_s3_uri(output_s3_uri)?;
 
     let mut buf = vec![];
     file.read_to_end(&mut buf).await?;

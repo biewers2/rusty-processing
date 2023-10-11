@@ -17,6 +17,25 @@ use crate::workspace::Workspace;
 #[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub struct Rfc822Processor;
 
+#[async_trait]
+impl Process for Rfc822Processor {
+    async fn process(&self, ctx: ProcessContext, stream: ByteStream) -> anyhow::Result<()> {
+        let mut raw = Vec::new();
+        let mut reader = stream_to_read(stream).await?;
+        reader.read_to_end(&mut raw)?;
+
+        let parser = MessageParser::default();
+        let message = parser.parse(&raw).ok_or(anyhow!("failed to parse message"))?;
+        self.process(ctx, message).await?;
+
+        Ok(())
+    }
+
+    fn name(&self) -> &'static str {
+        "RFC 822"
+    }
+}
+
 impl Rfc822Processor {
     /// Processes a message by extracting text and metadata, rendering a PDF, and then finding any embedded attachments.
     ///
@@ -116,24 +135,5 @@ impl Rfc822Processor {
         }
 
         Ok(())
-    }
-}
-
-#[async_trait]
-impl Process for Rfc822Processor {
-    async fn process(&self, ctx: ProcessContext, stream: ByteStream) -> anyhow::Result<()> {
-        let mut raw = Vec::new();
-        let mut reader = stream_to_read(stream).await?;
-        reader.read_to_end(&mut raw)?;
-
-        let parser = MessageParser::default();
-        let message = parser.parse(&raw).ok_or(anyhow!("failed to parse message"))?;
-        self.process(ctx, message).await?;
-
-        Ok(())
-    }
-
-    fn name(&self) -> &'static str {
-        "RFC 822"
     }
 }
