@@ -7,11 +7,13 @@
 #![warn(missing_docs)]
 
 use std::path::PathBuf;
+use anyhow::anyhow;
 use lazy_static::lazy_static;
 use log::{debug, info, warn};
+use tap::Tap;
 use tempfile::{NamedTempFile, TempPath};
 use tokio::sync::mpsc::{Receiver, Sender};
-use services::{ArchiveBuilder, ArchiveEntry};
+use services::{ArchiveBuilder, ArchiveEntry, log_err};
 use crate::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessType};
 
 /// Contains the core logic and interface for processing files.
@@ -74,7 +76,7 @@ pub async fn process(
     recurse: bool,
 ) -> anyhow::Result<tokio::fs::File> {
     let mimetype = mimetype.into();
-    info!("Processing stream with MIME type {}", mimetype);
+    info!("Processing file with MIME type {}", mimetype);
 
     let (output_sink, outputs) = tokio::sync::mpsc::channel(100);
     let (archive_entry_sink, archive_entries) = tokio::sync::mpsc::channel(100);
@@ -93,9 +95,9 @@ pub async fn process(
     ));
     let archive = tokio::spawn(build_archive(archive_entries));
 
-    processing.await??;
+    processing.await?.map_err(|err| anyhow!(format!("{}", err)))?;
     output_handling.await??;
-    info!("Finished processing stream");
+    info!("Finished processing file");
 
     let file = archive.await??;
     Ok(tokio::fs::File::from(file))
@@ -116,15 +118,12 @@ async fn handle_outputs(
     let worker_pool = threadpool::ThreadPool::new(OUTPUT_HANDLING_THREADS);
 
     while let Some(output) = outputs.recv().await {
-        match output {
-            Ok(output) => {
-                let archive_entry_sink = archive_entry_sink.clone();
-                worker_pool.execute(move || runtime().block_on(
-                    handle_output_asynchronously(output, recurse, archive_entry_sink)
-                ));
-            },
-            Err(e) => warn!("Error processing: {:?}", e),
-        };
+        if let Ok(output) = output.tap(log_err!("Error processing")) {
+            let archive_entry_sink = archive_entry_sink.clone();
+            worker_pool.execute(move || runtime().block_on(
+                handle_output_asynchronously(output, recurse, archive_entry_sink)
+            ));
+        }
     }
 
     worker_pool.join();

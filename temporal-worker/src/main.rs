@@ -17,7 +17,7 @@ const NAMESPACE: &str = "default";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    simple_logger::init_with_level(log::Level::Info)?;
+    simple_logger::init_with_level(log::Level::Debug)?;
 
     let host = config().get_or("TEMPORAL_HOST", "localhost");
     let port = config().get_or("TEMPORAL_PORT", "7233");

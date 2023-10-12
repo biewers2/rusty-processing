@@ -1,15 +1,26 @@
-use std::ops::DerefMut;
-use log::{info, warn};
+use std::path::{Path, PathBuf};
+
+use anyhow::{anyhow, Error};
+use lazy_static::lazy_static;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
-use tempfile::{NamedTempFile, TempPath};
-use temporal_sdk::ActContext;
+use tap::Tap;
+use tempfile::TempPath;
+use temporal_sdk::{ActContext, NonRetryableActivityError};
 use tokio::sync::mpsc::Receiver;
 
-use processing::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessType};
+use processing::processing::{ProcessContextBuilder, ProcessingError, processor, ProcessOutput, ProcessType};
+use processing::runtime;
+use services::log_err;
 
-use crate::io::S3GetObject;
+use crate::activities::download;
+use crate::activities::upload::upload;
 
 static PROCESS_TYPES: [ProcessType; 3] = [ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf];
+
+lazy_static! {
+    static ref THREAD_POOL: threadpool::ThreadPool = threadpool::ThreadPool::new(100);
+}
 
 /// Input to the `process_rusty_file` activity.
 ///
@@ -17,11 +28,11 @@ static PROCESS_TYPES: [ProcessType; 3] = [ProcessType::Text, ProcessType::Metada
 pub struct ProcessRustyFileInput {
     /// The S3 URI of the file to process.
     ///
-    source_s3_uri: String,
+    source_s3_uri: PathBuf,
 
     /// The S3 URI of where to write the output archive to.
     ///
-    output_dir_s3_uri: String,
+    output_dir_s3_uri: PathBuf,
 
     /// The MIME type of the file to process.
     ///
@@ -41,7 +52,7 @@ pub struct ProcessRustyFileOutput {
 pub struct FileInfo {
     /// The S3 URI of the file.
     ///
-    s3_uri: String,
+    s3_uri: PathBuf,
 
     /// The MIME type of the file.
     ///
@@ -70,64 +81,76 @@ pub async fn process_rusty_file(
         output_sink,
     ).build();
 
-    let path = download(input.source_s3_uri).await?;
+    let s3_uri = input.source_s3_uri;
+    let path = download(&s3_uri).await
+        .tap(log_err!("Failed to download from S3 URI {}", s3_uri.to_string_lossy()))?;
+
     let processing = tokio::spawn(processor().process(ctx, path.to_path_buf()));
-    let outputting = tokio::spawn(handle_outputs(outputs, input.output_dir_s3_uri));
+    let files = tokio::spawn(handle_outputs(outputs, input.output_dir_s3_uri));
 
-    processing.await??;
-    let files = outputting.await??;
+    processing.await?
+        .tap(log_err!("Failed to process file {}", s3_uri.to_string_lossy()))
+        .map_err(|err| {
+            match err {
+                ProcessingError::UnsupportedMimeType(_) => {
+                    Error::from(NonRetryableActivityError(anyhow!(format!("{}", err))))
+                },
+                ProcessingError::Unexpected(err) => err
+            }
+        })?;
 
+    let files = files.await?;
     Ok(ProcessRustyFileOutput { files })
 }
 
-async fn download(s3_uri: impl AsRef<str>) -> anyhow::Result<TempPath> {
-    let path = NamedTempFile::new()?.into_temp_path();
-    let mut file = tokio::fs::File::open(&path).await?;
-    let mut get_object = Box::new(S3GetObject::new(s3_uri).await?);
-    tokio::io::copy(&mut get_object.deref_mut().body, &mut file).await?;
+async fn handle_outputs(
+    mut outputs: Receiver<anyhow::Result<ProcessOutput>>,
+    output_dir_s3_uri: impl AsRef<Path>
+) -> Vec<FileInfo> {
+    info!("Handling outputs");
 
-    Ok(path)
-}
-
-async fn handle_outputs(mut outputs: Receiver<anyhow::Result<ProcessOutput>>, output_dir_s3_uri: impl AsRef<str>) -> anyhow::Result<Vec<FileInfo>> {
     let mut files = vec![];
     while let Some(output) = outputs.recv().await {
-        match output {
-            Ok(output) => {
-                if let Some(file_info) = handle_output(output, output_dir_s3_uri.as_ref()).await? {
-                    files.push(file_info);
-                }
-            },
-            Err(e) => warn!("Error processing: {:?}", e),
+        debug!("Received output: {:?}", output);
+
+        if let Ok(output) = output.tap(log_err!("Error processing file")) {
+            if let Some(file_info) = handle_output(output, &output_dir_s3_uri).await {
+                files.push(file_info);
+            }
         }
     }
-    Ok(files)
+
+    files
 }
 
-async fn handle_output(output: ProcessOutput, output_dir_s3_uri: impl AsRef<str>) -> anyhow::Result<Option<FileInfo>> {
+async fn handle_output(
+    output: ProcessOutput,
+    output_dir_s3_uri: impl AsRef<Path>
+) -> Option<FileInfo> {
     match output {
         ProcessOutput::Processed(_, data) => {
-            let s3_uri = format!("{}/{}", output_dir_s3_uri.as_ref(), data.name);
-            // let file = tokio::fs::File::open(data.path).await?;
-
-            info!("Uploading to {}", s3_uri);
-            // upload(file, s3_uri).await?;
-
-            Ok(None)
+            let s3_uri = output_dir_s3_uri.as_ref().join(data.name);
+            submit_upload(data.path, s3_uri);
+            None
         },
 
         ProcessOutput::Embedded(_, data, _) => {
-            let s3_uri = format!("{}/{}/{}", output_dir_s3_uri.as_ref(), data.dedupe_id, data.name);
-            // let file = tokio::fs::File::open(data.path).await?;
-
-            info!("Uploading to {}", s3_uri);
-            // upload(file, &s3_uri).await?;
-
-            Ok(Some(FileInfo {
+            let s3_uri = output_dir_s3_uri.as_ref().join(&data.dedupe_id).join(&data.name);
+            submit_upload(data.path, &s3_uri);
+            Some(FileInfo {
                 s3_uri,
                 mimetype: data.mimetype,
                 id: data.dedupe_id,
-            }))
+            })
         }
     }
+}
+
+fn submit_upload(path: TempPath, s3_uri: impl Into<PathBuf>) {
+    let s3_uri = s3_uri.into();
+    THREAD_POOL.execute(move ||
+        runtime().block_on(upload(path, s3_uri))
+            .tap(log_err!("Failed to upload file"))
+            .unwrap()
+    );
 }

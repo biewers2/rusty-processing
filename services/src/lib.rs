@@ -29,6 +29,20 @@ pub use pdf_to_image::*;
 pub use tika::*;
 pub use xdg_mime::*;
 
+/// Defines a closure that logs an error if the [`anyhow::Result`] passed in is an error.
+///
+/// Arguments follow the same syntax as [`format!`].
+///
+#[macro_export]
+macro_rules! log_err {
+    ($($arg:tt)+) => (
+        |res| if let Err(err) = res {
+            let msg = format!($($arg)+);
+            log::error!("{}: {}", msg, err);
+        }
+    );
+}
+
 pub(crate) fn no_reader() -> Option<Cursor<Vec<u8>>> { None }
 
 #[allow(dead_code)]

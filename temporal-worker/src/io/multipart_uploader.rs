@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use bytesize::MB;
@@ -12,7 +14,7 @@ pub struct MultipartUploader {
 }
 
 impl MultipartUploader {
-    pub fn new(s3_uri: impl AsRef<str>) -> anyhow::Result<Self> {
+    pub fn new(s3_uri: impl AsRef<Path>) -> anyhow::Result<Self> {
         let (bucket, key) = parse_s3_uri(s3_uri.as_ref())?;
         Ok(Self { bucket, key })
     }

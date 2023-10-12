@@ -1,5 +1,5 @@
+use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
-use anyhow::anyhow;
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use log::info;
@@ -15,6 +15,28 @@ lazy_static! {
 ///
 pub fn processor() -> &'static Processor {
     &PROCESSOR
+}
+
+/// Error that can occur during processing.
+///
+#[derive(Debug)]
+pub enum ProcessingError {
+    /// The MIME type is not supported by the processor.
+    ///
+    UnsupportedMimeType(String),
+
+    /// An unexpected error occurred.
+    ///
+    Unexpected(anyhow::Error),
+}
+
+impl Display for ProcessingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnsupportedMimeType(mimetype) => write!(f, "Unsupported MIME type: {}", mimetype),
+            Self::Unexpected(err) => write!(f, "Unexpected error: {}", err),
+        }
+    }
 }
 
 /// Process is a trait that defines the interface for process data from a file or as raw bytes.
@@ -62,14 +84,15 @@ impl Processor {
         &self,
         ctx: ProcessContext,
         path: PathBuf,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), ProcessingError> {
         let processor = self.processor(&ctx.mimetype)?;
 
         info!("Processing {} with processor {}", ctx.mimetype, processor.name());
         processor.process(ctx, path).await
+            .map_err(|err| ProcessingError::Unexpected(err))
     }
 
-    fn processor(&self, mimetype: &str) -> anyhow::Result<Box<dyn Process>> {
+    fn processor(&self, mimetype: &str) -> Result<Box<dyn Process>, ProcessingError> {
         match mimetype {
             #[cfg(feature = "archive")]
             "application/zip" => Ok(Box::<crate::application::zip::ZipProcessor>::default()),
@@ -80,7 +103,7 @@ impl Processor {
             #[cfg(feature = "mail")]
             "message/rfc822" => Ok(Box::<crate::message::rfc822::Rfc822Processor>::default()),
 
-            _ => Err(anyhow!("Unsupported MIME type: {}", mimetype)),
+            _ => Err(ProcessingError::UnsupportedMimeType(mimetype.to_string())),
         }
     }
 }

@@ -19,10 +19,12 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 services = { version = "0.1", path = "../services" }
 simple_logger = "4.2"
+tap = "1.0"
 tempfile = "3.8"
 temporal-sdk = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core-api = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
+threadpool = "1.8"
 tokio = { version = "1.32" }
 tokio-stream = { version = "0.1", default-features = false }
 url = "2.4"
