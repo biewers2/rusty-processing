@@ -1,3 +1,4 @@
+//!
 //! Code used by the Temporal worker.
 //!
 #![warn(missing_docs)]

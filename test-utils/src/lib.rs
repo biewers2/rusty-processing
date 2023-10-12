@@ -1,3 +1,8 @@
+//!
+//! # Test Utilities
+//!
+#![warn(missing_docs)]
+
 use std::io::Read;
 use std::path;
 use std::path::Path;
