@@ -48,11 +48,15 @@ pub async fn dedupe_checksum(content: &mut (impl AsyncRead + Unpin), mimetype: i
     Ok(checksum)
 }
 
+/// Calculates an MD5 checksum from the contents of a file.
+///
 async fn dedupe_md5_from_path(path: impl AsRef<Path>) -> anyhow::Result<String> {
     let mut content = tokio::fs::File::open(path).await?;
     dedupe_md5(&mut content).await
 }
 
+/// Calculates an MD5 checksum from the provided reader.
+///
 async fn dedupe_md5(content: &mut (impl AsyncRead + Unpin)) -> anyhow::Result<String> {
     let mut ctx = md5::Context::new();
     let mut buf = Box::new([0; MB as usize]);
@@ -62,11 +66,15 @@ async fn dedupe_md5(content: &mut (impl AsyncRead + Unpin)) -> anyhow::Result<St
     Ok(format!("{:x}", ctx.compute()))
 }
 
+/// Calculates an RFC822-based checksum from the contents of a file.
+///
 async fn dedupe_message_from_path(path: impl AsRef<Path>) -> anyhow::Result<String> {
     let mut file = tokio::fs::File::open(path).await?;
     dedupe_message(&mut file).await
 }
 
+/// Calculates an RFC822-based checksum from the provided reader.
+///
 async fn dedupe_message(content: &mut (impl AsyncRead + Unpin)) -> anyhow::Result<String> {
     let mut buf = vec![];
     content.read_to_end(&mut buf).await?;

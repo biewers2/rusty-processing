@@ -15,7 +15,7 @@ struct TestCase {
     files: Vec<String>,
 }
 
-const REGRESSION_TEST_CASES_PATH: &str = "resources/regression-test-cases.json";
+const REGRESSION_TEST_CASES_PATH: &str = "tests/regression-test-cases.json";
 
 #[tokio::test]
 async fn test_process_regression() -> anyhow::Result<()> {

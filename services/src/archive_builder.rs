@@ -6,6 +6,8 @@ use tempfile::TempPath;
 
 use tokio::io::AsyncReadExt;
 
+/// Represents the contents of a file to be archived.
+///
 #[derive(Debug)]
 pub struct ArchiveEntry {
     name: String,
@@ -14,11 +16,19 @@ pub struct ArchiveEntry {
 }
 
 impl ArchiveEntry {
+    /// Create a new archive entry.
+    ///
+    /// This can be passed to [`ArchiveBuilder::append`] to add the file to an archive.
+    ///
     pub fn new(name: String, path: TempPath, id_chain: Vec<String>) -> Self {
         Self { name, path, id_chain }
     }
 }
 
+/// A builder for creating an archive.
+///
+/// This builder eagerly writes the contents to an archive.
+///
 pub struct ArchiveBuilder {
     zipper: zip::ZipWriter<File>,
     size: usize,
@@ -26,6 +36,8 @@ pub struct ArchiveBuilder {
 }
 
 impl ArchiveBuilder {
+    /// Create a new archive builder.
+    ///
     pub fn new() -> anyhow::Result<Self> {
         let file = tempfile::tempfile()?;
         let zipper = zip::ZipWriter::new(file);
@@ -37,6 +49,8 @@ impl ArchiveBuilder {
         })
     }
 
+    /// Append an entry to the archive.
+    ///
     pub async fn append(&mut self, entry: ArchiveEntry) -> anyhow::Result<()> {
         let path = self.archive_entry_path(&entry.id_chain, &entry.name);
         let path_parent = path.parent().ok_or(anyhow::anyhow!("No parent"))?;
@@ -54,6 +68,13 @@ impl ArchiveBuilder {
         Ok(())
     }
 
+    /// Build the archive.
+    ///
+    /// # Returns
+    ///
+    /// If there is only one entry, a file handle representing the file of that entry is returned.
+    /// Otherwise, a file handle representing the archive is returned.
+    ///
     pub fn build(&mut self) -> anyhow::Result<File> {
         // Return the file if there is only one entry.
         if self.size == 1 {

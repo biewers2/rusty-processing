@@ -1,3 +1,8 @@
+//!
+//! Provides common services used for processing files.
+//!
+#![warn(missing_docs)]
+
 use std::ffi::OsStr;
 use std::fmt;
 use std::fmt::Formatter;
@@ -33,15 +38,29 @@ pub(crate) fn no_writer() -> Option<Vec<u8>> { None }
 ///
 #[derive(Debug, Clone)]
 pub enum CommandError<E = Error> {
+    /// When the command fails before exiting, such as if the child fails to spawn.
+    ///
     PreExit(E),
+
+    /// When the command fails after exiting, such as if the child exits with a non-zero status
+    /// or the I/O streams encountered a problem during execution.
+    ///
     PostExit(ExitStatus, E),
 }
 
 impl CommandError {
+    /// Short-hand for creating a [`CommandError::PreExit`].
+    ///
+    /// Useful to pass in as a function handler to mapping functions (i.e. `map_err`).
+    ///
     pub fn pre_exit(err: impl Into<Error>) -> Self {
         CommandError::PreExit(err.into())
     }
 
+    /// Short-hand for creating a [`CommandError::PostExit`].
+    ///
+    /// Useful to pass in as a function handler to mapping functions (i.e. `map_err`).
+    ///
     pub fn post_exit(status: ExitStatus, err: impl Into<Error>) -> Self {
         CommandError::PostExit(status, err.into())
     }
