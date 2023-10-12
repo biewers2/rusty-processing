@@ -5,7 +5,6 @@ members = [
   "identify",
   "processing",
   "services",
-  "streaming",
   "temporal-worker",
   "test-utils"
 ]

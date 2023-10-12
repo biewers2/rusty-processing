@@ -1,33 +1,43 @@
+use std::fmt::Debug;
 use std::fs::File;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
+use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::try_join;
 use mail_parser::{Message, MessageParser, MimeHeaders};
-use serde::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
 
-use identify::deduplication::dedupe_checksum;
-use streaming::{ByteStream, stream_to_read};
+use identify::deduplication::{dedupe_checksum, dedupe_checksum_from_path};
+use services::tika;
 
+use crate::build_paths_from_types;
 use crate::message::rfc822::mimetype;
 use crate::processing::{Process, ProcessContext, ProcessOutput};
-use crate::workspace::Workspace;
 
-#[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
-pub struct Rfc822Processor;
+#[derive(Debug, Default)]
+pub struct Rfc822Processor {
+    message_parser: MessageParser,
+}
 
 #[async_trait]
 impl Process for Rfc822Processor {
-    async fn process(&self, ctx: ProcessContext, stream: ByteStream) -> anyhow::Result<()> {
-        let mut raw = Vec::new();
-        let mut reader = stream_to_read(stream).await?;
-        reader.read_to_end(&mut raw)?;
+    /// Processes a message by extracting text and metadata, rendering a PDF, and then finding any embedded attachments.
+    ///
+    async fn process(&self, ctx: ProcessContext, path: PathBuf) -> anyhow::Result<()> {
+        let checksum = dedupe_checksum_from_path(&path, &ctx.mimetype).await?;
+        let paths = build_paths_from_types(&ctx.types)?;
 
-        let parser = MessageParser::default();
-        let message = parser.parse(&raw).ok_or(anyhow!("failed to parse message"))?;
-        self.process(ctx, message).await?;
+        let text_fut = self.process_text(&ctx, &path, paths.text, &checksum);
+        let meta_fut = self.process_metadata(&ctx, &path, paths.metadata, &checksum);
 
+        let content = Box::new(tokio::fs::read(&path).await?);
+        let message = self.message_parser.parse(content.as_ref()).ok_or(anyhow!("failed to parse message"))?;
+        let pdf_fut = self.process_pdf(&ctx, &message, paths.pdf, &checksum);
+        let attach_fut = self.process_attachments(&ctx, &message);
+
+        try_join!(text_fut, meta_fut, pdf_fut, attach_fut)?;
         Ok(())
     }
 
@@ -37,39 +47,20 @@ impl Process for Rfc822Processor {
 }
 
 impl Rfc822Processor {
-    /// Processes a message by extracting text and metadata, rendering a PDF, and then finding any embedded attachments.
-    ///
-    async fn process(&self, ctx: ProcessContext, message: Message<'_>) -> anyhow::Result<()> {
-        let content = message.raw_message();
-        let mut reader = Cursor::new(content);
-
-        let checksum = dedupe_checksum(&mut reader, &ctx.mimetype).await?;
-        let wkspace = Workspace::new(&message.raw_message, &ctx.types)?;
-
-        let text_fut = self.process_text(&ctx, &message, wkspace.text_path, &checksum);
-        let meta_fut = self.process_metadata(&ctx, &message, wkspace.metadata_path, &checksum);
-        let pdf_fut = self.process_pdf(&ctx, &message, wkspace.pdf_path, &checksum);
-        let attach_fut = self.process_attachments(&ctx, &message);
-
-        try_join!(text_fut, meta_fut, pdf_fut, attach_fut)?;
-        Ok(())
-    }
-
     /// Extracts the text from the message and emits it as processed output.
     ///
     async fn process_text(
         &self,
         ctx: &ProcessContext,
-        message: &Message<'_>,
-        path: Option<tempfile::TempPath>,
+        message_path: impl AsRef<Path>,
+        text_path: Option<tempfile::TempPath>,
         dedupe_id: impl Into<String>,
     ) -> anyhow::Result<()> {
-        if let Some(path) = path {
-            let mut writer = File::create(&path)?;
-            let result = self.extract_text(message, &mut writer).map(|_|
-                ProcessOutput::processed(ctx, "extracted.txt", path, "text/plain", dedupe_id)
-            );
-            ctx.add_output(result).await?;
+        if let Some(path) = text_path {
+            tika().text_into_file(message_path, &path).await?;
+
+            let output = ProcessOutput::processed(ctx, "extracted.txt", path, "text/plain", dedupe_id);
+            ctx.add_output(Ok(output)).await?;
         }
 
         Ok(())
@@ -80,15 +71,19 @@ impl Rfc822Processor {
     async fn process_metadata(
         &self,
         ctx: &ProcessContext,
-        message: &Message<'_>,
-        path: Option<tempfile::TempPath>,
+        message_path: impl AsRef<Path>,
+        metadata_path: Option<tempfile::TempPath>,
         dedupe_id: impl Into<String>,
     ) -> anyhow::Result<()> {
-        if let Some(path) = path {
-            let mut writer = File::create(&path)?;
-            let result = self.extract_metadata(message, &mut writer).map(|_|
-                ProcessOutput::processed(ctx, "metadata.json", path, "application/json", dedupe_id)
-            );
+        if let Some(path) = metadata_path {
+            let result = async {
+                let mut metadata = tika().metadata(message_path).await?;
+                tokio::fs::write(&path, &mut metadata).await?;
+
+                let output = ProcessOutput::processed(ctx, "metadata.json", path, "application/json", dedupe_id);
+                anyhow::Ok(output)
+            }.await;
+
             ctx.add_output(result).await?;
         }
         Ok(())
@@ -100,10 +95,10 @@ impl Rfc822Processor {
         &self,
         ctx: &ProcessContext,
         message: &Message<'_>,
-        path: Option<tempfile::TempPath>,
+        pdf_path: Option<tempfile::TempPath>,
         dedupe_id: impl Into<String>,
     ) -> anyhow::Result<()> {
-        if let Some(path) = path {
+        if let Some(path) = pdf_path {
             let mut writer = File::create(&path)?;
             let result = self.render_pdf(message, &mut writer).await.map(|_|
                 ProcessOutput::processed(ctx, "rendered.pdf", path, "application/pdf", dedupe_id)
@@ -127,11 +122,13 @@ impl Rfc822Processor {
 
             let mut reader = Cursor::new(part.contents());
             let checksum = dedupe_checksum(&mut reader, &mimetype).await?;
-
             let name = part.attachment_name().unwrap_or("message-attachment.dat");
-            let Workspace { original_path, .. } = Workspace::new(part.contents(), &[])?;
 
-            ctx.add_output(Ok(ProcessOutput::embedded(ctx, name, original_path, mimetype, checksum))).await?;
+            let mut file = NamedTempFile::new()?;
+            std::io::copy(&mut part.contents(), &mut file)?;
+
+            let output = ProcessOutput::embedded(ctx, name, file.into_temp_path(), mimetype, checksum);
+            ctx.add_output(Ok(output)).await?;
         }
 
         Ok(())

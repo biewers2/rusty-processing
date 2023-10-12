@@ -6,12 +6,12 @@
 //!
 #![warn(missing_docs)]
 
+use std::path::PathBuf;
 use lazy_static::lazy_static;
 use log::{debug, info, warn};
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempPath};
 use tokio::sync::mpsc::{Receiver, Sender};
 use services::{ArchiveBuilder, ArchiveEntry};
-use streaming::{async_read_to_stream, ByteStream};
 use crate::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessType};
 
 /// Contains the core logic and interface for processing files.
@@ -33,8 +33,6 @@ pub(crate) mod message {
     pub mod rfc822;
 }
 
-pub(crate) mod workspace;
-
 /// The number of threads to use for handling outputs.
 ///
 const OUTPUT_HANDLING_THREADS: usize = 1000;
@@ -50,12 +48,6 @@ lazy_static! {
 ///
 pub fn runtime() -> &'static tokio::runtime::Runtime {
     &RUNTIME
-}
-
-/// Creates a temporary file and returns its path.
-///
-pub fn temp_path() -> anyhow::Result<tempfile::TempPath> {
-    Ok(NamedTempFile::new()?.into_temp_path())
 }
 
 /// Process a stream of bytes.
@@ -75,8 +67,8 @@ pub fn temp_path() -> anyhow::Result<tempfile::TempPath> {
 ///     containing the output files of the processing operation.
 /// * `Err(_)` - If there was an error processing the stream of bytes.
 ///
-pub async fn process_rusty_stream(
-    stream: ByteStream,
+pub async fn process(
+    path: impl Into<PathBuf>,
     mimetype: impl Into<String>,
     types: Vec<ProcessType>,
     recurse: bool,
@@ -93,7 +85,7 @@ pub async fn process_rusty_stream(
         output_sink,
     ).build();
 
-    let processing = tokio::spawn(processor().process(ctx, stream));
+    let processing = tokio::spawn(processor().process(ctx, path.into()));
     let output_handling = tokio::spawn(handle_outputs(
         outputs,
         archive_entry_sink,
@@ -170,23 +162,17 @@ async fn handle_process_output_recursively(output: ProcessOutput) -> anyhow::Res
             let mut id_chain = state.id_chain;
             id_chain.push(data.dedupe_id);
 
-            let ctx_builder = ProcessContextBuilder::new(
-                data.mimetype,
-                data.types,
-                output_sink.clone(),
-            );
-            let ctx = ctx_builder.id_chain(id_chain.clone()).build();
+            let ctx =
+                ProcessContextBuilder::new(
+                    data.mimetype,
+                    data.types,
+                    output_sink.clone(),
+                )
+                .id_chain(id_chain.clone())
+                .build();
 
-            let file = Box::new(tokio::fs::File::open(&data.path).await?);
-            let (emb_stream, emb_read_fut) = async_read_to_stream(file) ?;
-            let emb_read_fut = tokio::spawn(emb_read_fut);
-
-            match processor().process(ctx, emb_stream).await {
-                Ok(_) => emb_read_fut.await??,
-                Err(e) => {
-                    warn!("Error processing: {:?}", e);
-                    let _ = emb_read_fut.await?; // Channel will close due to error, ignore it.
-                }
+            if let Err(e) = processor().process(ctx, data.path.to_path_buf()).await {
+                warn!("Error processing: {:?}", e);
             };
 
             Ok(ArchiveEntry::new(data.name, data.path, id_chain))
@@ -220,4 +206,58 @@ async fn build_archive(mut entries: Receiver<ArchiveEntry>) -> anyhow::Result<st
         archive_builder.append(archive_path).await?;
     }
     archive_builder.build()
+}
+
+pub(crate) struct ProcessTypePaths {
+    text: Option <TempPath>,
+    metadata: Option<TempPath>,
+    pdf: Option<TempPath>,
+}
+
+/// Build a tuple of paths (Text, Metadata, PDF) from a list of process types.
+///
+/// # Arguments
+///
+/// * `types` - A list of process types to build paths for.
+///
+/// # Returns
+///
+/// A tuple of paths (Text, Metadata, PDF) where each element is `Some(path)` if the corresponding
+/// process type is in the list, or `None` if it is not.
+///
+pub(crate) fn build_paths_from_types(types: &[ProcessType]) -> anyhow::Result<ProcessTypePaths> {
+    let text = types.contains(&ProcessType::Text).then(temp_path).transpose()?;
+    let metadata = types.contains(&ProcessType::Metadata).then(temp_path).transpose()?;
+    let pdf = types.contains(&ProcessType::Pdf).then(temp_path).transpose()?;
+    Ok(ProcessTypePaths { text, metadata, pdf })
+}
+
+/// Creates a temporary file and returns its path.
+///
+fn temp_path() -> std::io::Result<TempPath> {
+    Ok(NamedTempFile::new()?.into_temp_path())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_build_paths_from_types_no_types() {
+        let paths = build_paths_from_types(&[]).unwrap();
+
+        assert!(paths.text.is_none());
+        assert!(paths.metadata.is_none());
+        assert!(paths.pdf.is_none());
+    }
+
+    #[test]
+    fn test_build_paths_from_types_all_types() {
+        let types = vec![ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf];
+        let paths = build_paths_from_types(&types).unwrap();
+
+        assert!(paths.text.is_some());
+        assert!(paths.metadata.is_some());
+        assert!(paths.pdf.is_some());
+    }
 }

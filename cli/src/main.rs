@@ -2,8 +2,7 @@ use std::path;
 
 use clap::Parser;
 
-use streaming::async_read_to_stream;
-use processing::process_rusty_stream;
+use processing::process;
 use processing::processing::ProcessType;
 
 #[derive(Parser, Debug)]
@@ -58,13 +57,7 @@ async fn main() -> anyhow::Result<()> {
         args.types
     };
 
-    let input_file = Box::new(tokio::fs::File::open(&args.input).await?);
-    let (stream, reading) = async_read_to_stream(input_file)?;
-    let reading = tokio::spawn(reading);
-
-    let mut resulting_file = process_rusty_stream(stream, args.mimetype, types, true).await?;
-    reading.await??;
-
+    let mut resulting_file = process(args.input, args.mimetype, types, true).await?;
     let mut output_file = tokio::fs::File::create(args.output).await?;
     tokio::io::copy(&mut resulting_file, &mut output_file).await?;
 

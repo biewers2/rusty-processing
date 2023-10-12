@@ -1,15 +1,15 @@
-use std::io::{BufReader, Cursor};
+use std::io::{Cursor, Write};
+use std::path::PathBuf;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use log::{info, warn};
 use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
 use identify::deduplication::dedupe_checksum;
-use streaming::{ByteStream, stream_to_read};
 
 use crate::processing::{Process, ProcessContext, ProcessOutput};
-use crate::workspace::Workspace;
 
 /// MboxProcessor is responsible for processing mbox files.
 ///
@@ -23,10 +23,11 @@ impl MboxProcessor {
     /// Writes a message to the output directory.
     ///
     async fn process_message(&self, ctx: &ProcessContext, message: Message) -> anyhow::Result<ProcessOutput> {
+        let mut file = NamedTempFile::new()?;
         let contents = message.unwrap_contents();
+        file.write_all(&contents)?;
 
         let mimetype = "message/rfc822";
-        let Workspace { original_path, .. } = Workspace::new(&contents, &[])?;
         let ctx = ctx.new_clone(mimetype.to_string());
 
         let mut contents = Cursor::new(contents);
@@ -35,7 +36,7 @@ impl MboxProcessor {
         Ok(ProcessOutput::embedded(
             &ctx,
             "mbox-message.eml",
-            original_path,
+            file.into_temp_path(),
             mimetype,
             checksum,
         ))
@@ -44,9 +45,10 @@ impl MboxProcessor {
 
 #[async_trait]
 impl Process for MboxProcessor {
-    async fn process(&self, ctx: ProcessContext, content: ByteStream) -> anyhow::Result<()> {
+    async fn process(&self, ctx: ProcessContext, path: PathBuf) -> anyhow::Result<()> {
         info!("Reading mbox into iterator");
-        let reader = BufReader::new(stream_to_read(content).await?);
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
         let message_iter = MessageIterator::new(reader);
 
         info!("Processing embedded messages");
@@ -73,7 +75,6 @@ mod tests {
 
     use tokio::sync::mpsc::Receiver;
     use tokio::task::JoinHandle;
-    use test_utils::byte_stream_from_fs;
 
     use crate::processing::ProcessContextBuilder;
 
@@ -91,8 +92,7 @@ mod tests {
     fn process(path: path::PathBuf) -> anyhow::Result<(ProcessFuture, OutputReceiver)> {
         let (processor, ctx, output_rx) = processor_with_context()?;
         let proc_fut = tokio::spawn(async move {
-            let stream = byte_stream_from_fs(path).await?;
-            processor.process(ctx, stream).await?;
+            processor.process(ctx, path).await?;
             anyhow::Ok(())
         });
         Ok((proc_fut, output_rx))

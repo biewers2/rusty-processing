@@ -1,12 +1,13 @@
-mod common;
-
 use std::{fs, path};
-use std::fs::File;
+
 use serde::Deserialize;
-use processing::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessOutputData, ProcessState, ProcessType};
+
 use common::assertions::{assert_identical, assert_identical_metadata};
-use streaming::read_to_stream;
+use processing::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessOutputData, ProcessState, ProcessType};
+
 use crate::common::assertions::assert_identical_text;
+
+mod common;
 
 #[derive(Debug, Deserialize)]
 struct TestCase {
@@ -30,11 +31,7 @@ async fn test_process_regression() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn process(mimetype: String, path: String) -> anyhow::Result<()> {
-    let file = Box::new(File::open(&path)?);
-    let (stream, reading) = read_to_stream(file)?;
-    let reading = tokio::spawn(reading);
-
+async fn process(mimetype: String, path_str: impl AsRef<str>) -> anyhow::Result<()> {
     let (output_sink, mut outputs) = tokio::sync::mpsc::channel(100);
     let ctx = ProcessContextBuilder::new(
         mimetype,
@@ -42,20 +39,20 @@ async fn process(mimetype: String, path: String) -> anyhow::Result<()> {
         output_sink,
     ).build();
 
-    let processing = tokio::spawn(processor().process(ctx, stream));
+    let path = path::PathBuf::from(path_str.as_ref());
+    let processing = tokio::spawn(processor().process(ctx, path));
 
     while let Some(output) = outputs.recv().await {
         match output? {
             ProcessOutput::Processed(state, data) => {
-                assert_processed_output(expected_dir(&path, None), state, data)
+                assert_processed_output(expected_dir(&path_str, None), state, data)
             },
             ProcessOutput::Embedded(state, data, _) => {
-                assert_embedded_output(expected_dir(&path, Some(&data.dedupe_id)), state, data)
+                assert_embedded_output(expected_dir(&path_str, Some(&data.dedupe_id)), state, data)
             }
         }
     }
 
-    reading.await??;
     processing.await??;
     Ok(())
 }
@@ -79,8 +76,8 @@ fn assert_embedded_output(expected_dir: path::PathBuf, _state: ProcessState, dat
     assert_identical(expected_path, data.path);
 }
 
-fn expected_dir(path: &str, dedupe_id: Option<&str>) -> path::PathBuf {
-    let path_str = format!("{}-expected", path);
+fn expected_dir(path: impl AsRef<str>, dedupe_id: Option<&str>) -> path::PathBuf {
+    let path_str = format!("{}-expected", path.as_ref());
     let path = path::PathBuf::from(path_str);
     match dedupe_id {
         Some(dedupe_id) => path.join(dedupe_id),

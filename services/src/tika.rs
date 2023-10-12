@@ -1,16 +1,13 @@
-use std::future::Future;
 use std::path::Path;
 
 use anyhow::anyhow;
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use log::{debug, info};
-use reqwest::Body;
-use tokio::io::AsyncRead;
-use tokio_stream::wrappers::ReceiverStream;
+use reqwest::{Body, Response};
+use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-use streaming::ByteStream;
 use crate::config;
 
 pub type TikaService = Box<Tika>;
@@ -49,29 +46,40 @@ impl Tika {
             .is_ok()
     }
 
-    pub async fn text(&self, path: impl AsRef<Path>) -> anyhow::Result<(ByteStream, impl Future<Output=anyhow::Result<()>>)> {
+    pub async fn text(&self, input_path: impl AsRef<Path>) -> anyhow::Result<String> {
         info!("Using Tika to extract text");
 
-        let input = tokio::fs::File::open(path).await?;
-        let response = self.http_client
+        let response = self.request_text(input_path).await?;
+        debug!("Tika responded with {}", response.status());
+
+        let bytes = response.bytes().await?;
+        let text = String::from_utf8(bytes.to_vec())?;
+        Ok(text)
+    }
+
+    pub async fn text_into_file(&self, input_path: impl AsRef<Path>, output_path: impl AsRef<Path>) -> anyhow::Result<()> {
+        info!("Using Tika to extract text");
+
+        let response = self.request_text(input_path).await?;
+        debug!("Tika responded with {}", response.status());
+
+        let mut stream = response.bytes_stream();
+        let mut output_file = tokio::fs::File::create(output_path.as_ref()).await?;
+        while let Some(bytes) = stream.next().await {
+            output_file.write_all(&bytes?).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn request_text(&self, input_path: impl AsRef<Path>) -> anyhow::Result<Response> {
+        let input = tokio::fs::File::open(input_path).await?;
+        Ok(self.http_client
             .put(self.url("/tika"))
             .header("Accept", "text/plain")
             .header("X-Tika-Skip-Embedded", "true")
             .body(Self::body_from_input(input))
-            .send().await?;
-        debug!("Tika responded with {}", response.status());
-
-        let (sink, stream) = tokio::sync::mpsc::channel(100);
-        let reading = async move {
-            let mut stream = response.bytes_stream();
-            while let Some(bytes) = stream.next().await {
-                sink.send(bytes?).await?;
-            }
-            anyhow::Ok(())
-        };
-
-        let stream = Box::pin(ReceiverStream::new(stream));
-        Ok((stream, reading))
+            .send().await?)
     }
 
     pub async fn metadata(&self, path: impl AsRef<Path>) -> anyhow::Result<String> {
@@ -144,6 +152,7 @@ impl Tika {
 #[cfg(test)]
 mod tests {
     use std::any::{Any, TypeId};
+
     use super::*;
 
     #[test]

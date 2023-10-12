@@ -1,4 +1,5 @@
 use std::io::{Read, Seek};
+use std::path::PathBuf;
 
 use anyhow::anyhow;
 use async_stream::stream;
@@ -6,15 +7,13 @@ use async_trait::async_trait;
 use futures::{pin_mut, StreamExt};
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
-use tempfile::TempPath;
+use tempfile::{NamedTempFile, TempPath};
 use zip::ZipArchive;
 
 use identify::deduplication::dedupe_checksum_from_path;
 use identify::mimetype::identify_mimetype;
-use streaming::{ByteStream, stream_to_read};
 
 use crate::processing::{Process, ProcessContext, ProcessOutput};
-use crate::temp_path;
 
 enum NextArchiveEntry {
     Dir(String),
@@ -33,14 +32,11 @@ pub struct ZipProcessor;
 
 #[async_trait]
 impl Process for ZipProcessor {
-    async fn process(&self, ctx: ProcessContext, stream: ByteStream) -> anyhow::Result<()> {
-        info!("Spooling zip file");
-        let mut read = stream_to_read(stream).await?;
-        let archive_path = spool_read(&mut read)?;
-
+    async fn process(&self, ctx: ProcessContext, path: PathBuf) -> anyhow::Result<()> {
         info!("Opening zip file");
-        let archive_file = std::fs::File::open(&archive_path)?;
-        let mut archive = ZipArchive::new(archive_file)?;
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+        let mut archive = ZipArchive::new(reader)?;
 
         info!("Streaming zip file entries");
         let output_stream = stream! {
@@ -53,6 +49,7 @@ impl Process for ZipProcessor {
         while let Some(result) = output_stream.next().await {
             match result {
                 Ok(NextArchiveEntry::File(entry)) => {
+                    info!("Discovered ZIP file {}", entry.name);
                     let ArchiveEntry { name, path, dedupe_checksum, mimetype } = entry;
                     let output = ProcessOutput::embedded(&ctx, name, path, mimetype, dedupe_checksum);
                     ctx.add_output(Ok(output)).await?;
@@ -99,9 +96,7 @@ async fn next_archive_entry<R>(archive: &mut ZipArchive<R>, index: usize) -> any
 /// Write contents to a temporary file and return the temporary path.
 ///
 fn spool_read(mut reader: impl Read) -> anyhow::Result<TempPath> {
-    let path = temp_path()?;
-    let file = std::fs::File::create(&path)?;
-    let mut writer = std::io::BufWriter::new(file);
-    std::io::copy(&mut reader, &mut writer)?;
-    Ok(path)
+    let mut file = NamedTempFile::new()?;
+    std::io::copy(&mut reader, &mut file)?;
+    Ok(file.into_temp_path())
 }

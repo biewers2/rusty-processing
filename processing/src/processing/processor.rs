@@ -1,9 +1,9 @@
+use std::path::PathBuf;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use log::info;
 use serde::{Deserialize, Serialize};
-use streaming::ByteStream;
 
 use crate::processing::ProcessContext;
 
@@ -30,7 +30,7 @@ pub trait Process: Send + Sync {
     /// * `ctx` - The context of the processing operation.
     /// * `content` - Async reader of the raw bytes to process.
     ///
-    async fn process(&self, ctx: ProcessContext, stream: ByteStream) -> anyhow::Result<()>;
+    async fn process(&self, ctx: ProcessContext, path: PathBuf) -> anyhow::Result<()>;
 
     /// Returns the name of the processor.
     ///
@@ -61,12 +61,12 @@ impl Processor {
     pub async fn process(
         &self,
         ctx: ProcessContext,
-        stream: ByteStream,
+        path: PathBuf,
     ) -> anyhow::Result<()> {
         let processor = self.processor(&ctx.mimetype)?;
 
         info!("Processing {} with processor {}", ctx.mimetype, processor.name());
-        processor.process(ctx, stream).await
+        processor.process(ctx, path).await
     }
 
     fn processor(&self, mimetype: &str) -> anyhow::Result<Box<dyn Process>> {

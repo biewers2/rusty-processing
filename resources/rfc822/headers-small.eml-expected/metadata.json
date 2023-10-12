@@ -1,14 +1,1 @@
-{
-  "Message-ID": "<12345-headers-small@rusty-processing>",
-  "Date": "Wed, 21 Feb 2021 07:58:00 -0800 (CST)",
-  "From": "rusty.processing@mime.com",
-  "To": "processing.rusty@emim.com",
-  "Subject": "Now THATS A LOT OF RUST",
-  "MIME-Version": "1.0",
-  "Content-Type": "text/plain; charset=us-ascii",
-  "Content-Transfer-Encoding": "7bit",
-  "File-Extension": "eml",
-  "File-Size": 310,
-  "Has-Attachments": false,
-  "Attachment-Count": 0
-}
+{"Message:Raw-Header:Content-Type":"text/plain; charset=us-ascii","dc:subject":"Now THATS A LOT OF RUST","Message:Raw-Header:Mime-Version":"1.0","X-TIKA:Parsed-By-Full-Set":["org.apache.tika.parser.DefaultParser","org.apache.tika.parser.mail.RFC822Parser"],"dc:creator":"rusty.processing@mime.com","Message:Raw-Header:Content-Transfer-Encoding":"7bit","dcterms:created":"2021-02-21T15:58:00Z","Message:From-Email":"rusty.processing@mime.com","language":"en","Message-To":"processing.rusty@emim.com","X-TIKA:Parsed-By":["org.apache.tika.parser.DefaultParser","org.apache.tika.parser.mail.RFC822Parser"],"Message:Raw-Header:Message-ID":"<12345-headers-small@rusty-processing>","dc:title":"Now THATS A LOT OF RUST","Message-From":"rusty.processing@mime.com","Content-Type":"message/rfc822"}

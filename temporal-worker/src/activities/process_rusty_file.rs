@@ -1,10 +1,11 @@
+use std::ops::DerefMut;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
+use tempfile::{NamedTempFile, TempPath};
 use temporal_sdk::ActContext;
 use tokio::sync::mpsc::Receiver;
 
 use processing::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessType};
-use streaming::async_read_to_stream;
 
 use crate::io::S3GetObject;
 
@@ -57,34 +58,35 @@ pub struct FileInfo {
 /// result back to S3 in the form of an archive.
 ///
 pub async fn process_rusty_file(
-    // ctx: WfContext,
     _ctx: ActContext,
     input: ProcessRustyFileInput,
 ) -> anyhow::Result<ProcessRustyFileOutput> {
-// ) -> anyhow::Result<WfExitValue<ProcessRustyFileOutput>> {
     info!("Processing rusty file: {:?}", input);
 
-    let get_object = Box::new(S3GetObject::new(input.source_s3_uri).await?);
-    let (stream, get_object) = async_read_to_stream(get_object.body)?;
     let (output_sink, outputs) = tokio::sync::mpsc::channel(100);
-
-    info!("Building processing context");
     let ctx = ProcessContextBuilder::new(
         input.mimetype,
         PROCESS_TYPES.to_vec(),
         output_sink,
     ).build();
 
-    info!("Starting processing threads");
-    let get_object = tokio::spawn(get_object);
-    let processing = tokio::spawn(processor().process(ctx, stream));
+    let path = download(input.source_s3_uri).await?;
+    let processing = tokio::spawn(processor().process(ctx, path.to_path_buf()));
     let outputting = tokio::spawn(handle_outputs(outputs, input.output_dir_s3_uri));
 
     processing.await??;
-    get_object.await??;
     let files = outputting.await??;
 
     Ok(ProcessRustyFileOutput { files })
+}
+
+async fn download(s3_uri: impl AsRef<str>) -> anyhow::Result<TempPath> {
+    let path = NamedTempFile::new()?.into_temp_path();
+    let mut file = tokio::fs::File::open(&path).await?;
+    let mut get_object = Box::new(S3GetObject::new(s3_uri).await?);
+    tokio::io::copy(&mut get_object.deref_mut().body, &mut file).await?;
+
+    Ok(path)
 }
 
 async fn handle_outputs(mut outputs: Receiver<anyhow::Result<ProcessOutput>>, output_dir_s3_uri: impl AsRef<str>) -> anyhow::Result<Vec<FileInfo>> {

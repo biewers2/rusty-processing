@@ -1,7 +1,5 @@
 use services::tika;
 
-use streaming::stream_to_string;
-
 #[tokio::test]
 async fn test_tika_server_connection() {
     assert!(tika().is_connected().await);
@@ -38,11 +36,8 @@ Backflush w/ cleaner
 ";
     let path = "../resources/pdf/Espresso Machine Cleaning Guide.pdf";
 
-    let (stream, streaming) = tika().text(path).await?;
+    let text = tika().text(path).await?;
 
-    let streaming = tokio::spawn(streaming);
-    let text = stream_to_string(stream).await;
-    streaming.await??;
     assert_eq!(text, expected_text);
     Ok(())
 }
@@ -51,11 +46,8 @@ Backflush w/ cleaner
 async fn test_tika_text_with_ocr() -> anyhow::Result<()> {
     let path = "../resources/jpg/jQuery-text.jpg";
 
-    let (stream, streaming) = tika().text(path).await?;
+    let text = tika().text(path).await?;
 
-    let streaming = tokio::spawn(streaming);
-    let text = stream_to_string(stream).await;
-    streaming.await??;
     assert_eq!(text, "jQuery $%&U6~\n\n\n");
     Ok(())
 }

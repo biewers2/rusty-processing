@@ -5,11 +5,8 @@ mod html_message_visitor;
 mod message_formatter;
 mod message_visitor;
 mod processor;
-mod text_message_visitor;
 mod transformer;
 
-mod text;
-mod metadata;
 mod pdf;
 
 /// Get the MIME type from a `mail_parser::ContentType`.

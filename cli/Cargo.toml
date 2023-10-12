@@ -9,5 +9,4 @@ clap = { version = "~4.4.0", features = ["derive"] }
 log = "0.4"
 processing = { version = "0.1", path = "../processing" }
 simple_logger = "4.2"
-streaming = { version = "0.1", path = "../streaming" }
 tokio = "1.32"
