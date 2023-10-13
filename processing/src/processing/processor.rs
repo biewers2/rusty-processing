@@ -1,10 +1,15 @@
 use std::fmt::{Debug, Display, Formatter};
-use std::path::PathBuf;
-use async_trait::async_trait;
-use lazy_static::lazy_static;
-use log::info;
-use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
+use async_trait::async_trait;
+use futures::future::try_join_all;
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use tempfile::TempPath;
+
+use identify::deduplication::dedupe_checksum_from_path;
+
+use crate::build_paths_from_types;
 use crate::processing::ProcessContext;
 
 lazy_static! {
@@ -44,15 +49,22 @@ impl Display for ProcessingError {
 /// Process implementations are required to be thread safe.
 ///
 #[async_trait]
-pub trait Process: Send + Sync {
+pub(crate) trait Process: Send + Sync {
     /// Process a stream of bytes.
     ///
     /// # Arguments
     ///
     /// * `ctx` - The context of the processing operation.
-    /// * `content` - Async reader of the raw bytes to process.
+    /// * `input_path` - The path to the input file.
+    /// * `output_path` - The path to the output file.
     ///
-    async fn process(&self, ctx: ProcessContext, path: PathBuf) -> anyhow::Result<()>;
+    async fn process(
+        &self,
+        ctx: &ProcessContext,
+        input_path: &Path,
+        output_path: Option<TempPath>,
+        checksum: &str,
+    ) -> anyhow::Result<()>;
 
     /// Returns the name of the processor.
     ///
@@ -83,27 +95,68 @@ impl Processor {
     pub async fn process(
         &self,
         ctx: ProcessContext,
-        path: PathBuf,
+        input_path: PathBuf,
     ) -> Result<(), ProcessingError> {
-        let processor = self.processor(&ctx.mimetype)?;
+        let checksum = dedupe_checksum_from_path(&input_path, &ctx.mimetype).await
+            .map_err(|err| ProcessingError::Unexpected(anyhow::Error::from(err)))?;
 
-        info!("Processing {} with processor {}", ctx.mimetype, processor.name());
-        processor.process(ctx, path).await
-            .map_err(|err| ProcessingError::Unexpected(err))
+        let paths = build_paths_from_types(&ctx.types)
+            .map_err(|err| ProcessingError::Unexpected(anyhow::Error::from(err)))?;
+
+        let mut futures = vec![];
+        let processes = vec![
+            (self.text_processor(&ctx.mimetype), paths.text),
+            (self.metadata_processor(&ctx.mimetype), paths.metadata),
+            (self.pdf_processor(&ctx.mimetype), paths.pdf),
+            (self.embedded_processor(&ctx.mimetype), None),
+        ];
+
+        for (processor, path) in processes {
+            if let Some(processor) = processor {
+                let ctx_ref = &ctx;
+                let input_path_ref = &input_path;
+                let checksum = &checksum;
+
+                futures.push(async move {
+                    processor.process(ctx_ref, input_path_ref, path, checksum).await
+                });
+            }
+        }
+
+        try_join_all(futures).await.map_err(|err| ProcessingError::Unexpected(err))?;
+        Ok(())
     }
 
-    fn processor(&self, mimetype: &str) -> Result<Box<dyn Process>, ProcessingError> {
+    fn text_processor(&self, mimetype: &str) -> Option<Box<dyn Process>> {
         match mimetype {
-            #[cfg(feature = "archive")]
-            "application/zip" => Ok(Box::<crate::application::zip::ZipProcessor>::default()),
+            "application/zip" |
+            "application/mbox" => None,
 
-            #[cfg(feature = "mail")]
-            "application/mbox" => Ok(Box::<crate::application::mbox::MboxProcessor>::default()),
+            _ => Some(Box::<crate::text::DefaultTextProcessor>::default()),
+        }
+    }
 
-            #[cfg(feature = "mail")]
-            "message/rfc822" => Ok(Box::<crate::message::rfc822::Rfc822Processor>::default()),
+    fn metadata_processor(&self, mimetype: &str) -> Option<Box<dyn Process>> {
+        match mimetype {
+            _ => Some(Box::<crate::metadata::DefaultMetadataProcessor>::default())
+        }
+    }
 
-            _ => Err(ProcessingError::UnsupportedMimeType(mimetype.to_string())),
+    fn pdf_processor(&self, mimetype: &str) -> Option<Box<dyn Process>> {
+        match mimetype {
+            "message/rfc822" => Some(Box::<crate::pdf::Rfc822PdfProcessor>::default()),
+
+            _ => None
+        }
+    }
+
+    fn embedded_processor(&self, mimetype: &str) -> Option<Box<dyn Process>> {
+        match mimetype {
+            "application/zip" => Some(Box::<crate::embedded::ZipEmbeddedProcessor>::default()),
+            "application/mbox" => Some(Box::<crate::embedded::MboxEmbeddedProcessor>::default()),
+            "message/rfc822" => Some(Box::<crate::embedded::Rfc822EmbeddedProcessor>::default()),
+
+            _ => None
         }
     }
 }

@@ -135,12 +135,12 @@ async fn handle_output(
         },
 
         ProcessOutput::Embedded(_, data, _) => {
-            let s3_uri = output_dir_s3_uri.as_ref().join(&data.dedupe_id).join(&data.name);
+            let s3_uri = output_dir_s3_uri.as_ref().join(&data.checksum).join(&data.name);
             submit_upload(data.path, &s3_uri);
             Some(FileInfo {
                 s3_uri,
                 mimetype: data.mimetype,
-                id: data.dedupe_id,
+                id: data.checksum,
             })
         }
     }

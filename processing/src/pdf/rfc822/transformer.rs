@@ -2,8 +2,7 @@ use std::borrow::Cow;
 use std::io::Write;
 
 use mail_parser::{Address, HeaderValue, Message, MessagePart, PartType};
-
-use crate::message::rfc822::message_visitor::MessageVisitor;
+use crate::pdf::rfc822::message_visitor::MessageVisitor;
 
 /// Service to transform message content using a provided visitor implementation.
 ///

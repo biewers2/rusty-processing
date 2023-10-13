@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use log::{debug, info, warn};
+use mail_parser::ContentType;
 use tap::Tap;
 use tempfile::{NamedTempFile, TempPath};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -22,18 +23,10 @@ use crate::processing::{ProcessContextBuilder, processor, ProcessOutput, Process
 ///
 pub mod processing;
 
-pub(crate) mod application {
-    #[cfg(feature = "mail")]
-    pub mod mbox;
-
-    #[cfg(feature = "archive")]
-    pub mod zip;
-}
-
-#[cfg(feature = "mail")]
-pub(crate) mod message {
-    pub mod rfc822;
-}
+pub(crate) mod text;
+pub(crate) mod metadata;
+pub(crate) mod pdf;
+pub(crate) mod embedded;
 
 /// The number of threads to use for handling outputs.
 ///
@@ -159,7 +152,7 @@ async fn handle_process_output_recursively(output: ProcessOutput) -> anyhow::Res
 
         ProcessOutput::Embedded(state, data, output_sink) => {
             let mut id_chain = state.id_chain;
-            id_chain.push(data.dedupe_id);
+            id_chain.push(data.checksum);
 
             let ctx =
                 ProcessContextBuilder::new(
@@ -190,7 +183,7 @@ async fn handle_process_output(output: ProcessOutput) -> anyhow::Result<ArchiveE
 
         ProcessOutput::Embedded(state, data, _) => {
             let mut id_chain = state.id_chain;
-            id_chain.push(data.dedupe_id);
+            id_chain.push(data.checksum);
             Ok(ArchiveEntry::new(data.name, data.path, id_chain))
         }
     }
@@ -224,7 +217,7 @@ pub(crate) struct ProcessTypePaths {
 /// A tuple of paths (Text, Metadata, PDF) where each element is `Some(path)` if the corresponding
 /// process type is in the list, or `None` if it is not.
 ///
-pub(crate) fn build_paths_from_types(types: &[ProcessType]) -> anyhow::Result<ProcessTypePaths> {
+pub(crate) fn build_paths_from_types(types: &[ProcessType]) -> std::io::Result<ProcessTypePaths> {
     let text = types.contains(&ProcessType::Text).then(temp_path).transpose()?;
     let metadata = types.contains(&ProcessType::Metadata).then(temp_path).transpose()?;
     let pdf = types.contains(&ProcessType::Pdf).then(temp_path).transpose()?;
@@ -237,10 +230,29 @@ fn temp_path() -> std::io::Result<TempPath> {
     Ok(NamedTempFile::new()?.into_temp_path())
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+/// Get the MIME type from a `mail_parser::ContentType`.
+///
+/// # Arguments
+///
+/// * `content_type` - The `mail_parser::ContentType` to get the MIME type from.
+///
+/// # Returns
+///
+/// The MIME type formatted as a `String`.
+///
+pub fn mimetype(content_type: &ContentType) -> String {
+    match (content_type.ctype(), content_type.subtype()) {
+        (ctype, Some(subtype)) => format!("{}/{}", ctype, subtype),
+        (ctype, None) => ctype.to_string(),
+    }
+}
 
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+    use mail_parser::ContentType;
+    use super::*;
+    
     #[test]
     fn test_build_paths_from_types_no_types() {
         let paths = build_paths_from_types(&[]).unwrap();
@@ -258,5 +270,27 @@ mod test {
         assert!(paths.text.is_some());
         assert!(paths.metadata.is_some());
         assert!(paths.pdf.is_some());
+    }
+
+    #[test]
+    fn test_mimetype_with_subtype() {
+        let content_type = ContentType {
+            c_type: Cow::from("text"),
+            c_subtype: Some(Cow::from("plain")),
+            attributes: None,
+        };
+
+        assert_eq!(mimetype(&content_type), "text/plain");
+    }
+
+    #[test]
+    fn test_mimetype_without_subtype() {
+        let content_type = ContentType {
+            c_type: Cow::from("text"),
+            c_subtype: None,
+            attributes: None,
+        };
+
+        assert_eq!(mimetype(&content_type), "text");
     }
 }

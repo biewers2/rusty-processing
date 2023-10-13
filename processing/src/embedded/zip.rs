@@ -1,5 +1,5 @@
 use std::io::{Read, Seek};
-use std::path::PathBuf;
+use std::path::Path;
 
 use anyhow::anyhow;
 use async_stream::stream;
@@ -23,16 +23,22 @@ enum NextArchiveEntry {
 struct ArchiveEntry {
     name: String,
     path: TempPath,
-    dedupe_checksum: String,
+    checksum: String,
     mimetype: String,
 }
 
 #[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
-pub struct ZipProcessor;
+pub struct ZipEmbeddedProcessor;
 
 #[async_trait]
-impl Process for ZipProcessor {
-    async fn process(&self, ctx: ProcessContext, path: PathBuf) -> anyhow::Result<()> {
+impl Process for ZipEmbeddedProcessor {
+    async fn process(
+        &self,
+        ctx: &ProcessContext,
+        path:&Path,
+        _: Option<TempPath>,
+        _: &str,
+    ) -> anyhow::Result<()> {
         info!("Opening zip file");
         let file = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(file);
@@ -50,7 +56,7 @@ impl Process for ZipProcessor {
             match result {
                 Ok(NextArchiveEntry::File(entry)) => {
                     info!("Discovered ZIP file {}", entry.name);
-                    let ArchiveEntry { name, path, dedupe_checksum, mimetype } = entry;
+                    let ArchiveEntry { name, path, checksum: dedupe_checksum, mimetype } = entry;
                     let output = ProcessOutput::embedded(&ctx, name, path, mimetype, dedupe_checksum);
                     ctx.add_output(Ok(output)).await?;
                 },
@@ -87,10 +93,10 @@ async fn next_archive_entry<R>(archive: &mut ZipArchive<R>, index: usize) -> any
         (name, emb_path)
     };
 
-    let mimetype = identify_mimetype(&path).await?.unwrap_or("application/octet-stream".to_string());
+    let mimetype = identify_mimetype(&path).await?.unwrap_or("embedded/octet-stream".to_string());
     let checksum = dedupe_checksum_from_path(&path, &mimetype).await?;
 
-    Ok(NextArchiveEntry::File(ArchiveEntry { name, path, dedupe_checksum: checksum, mimetype }))
+    Ok(NextArchiveEntry::File(ArchiveEntry { name, path, checksum: checksum, mimetype }))
 }
 
 /// Write contents to a temporary file and return the temporary path.

@@ -223,7 +223,7 @@ pub struct ProcessOutputData {
 
     /// Deduplication ID of the output file.
     ///
-    pub dedupe_id: String,
+    pub checksum: String,
 }
 
 impl ProcessOutput {
@@ -234,14 +234,14 @@ impl ProcessOutput {
     /// * `ctx` - The ProcessContext of the processing operation.
     /// * `path` - The path to the output file.
     /// * `mimetype` - The MIME type of the output file.
-    /// * `dedupe_id` - The dupe ID of the output file.
+    /// * `checksum` - The dupe ID of the output file.
     ///
     pub fn processed(
         ctx: &ProcessContext,
         name: impl Into<String>,
         path: tempfile::TempPath,
         mimetype: impl Into<String>,
-        dedupe_id: impl Into<String>,
+        checksum: impl Into<String>,
     ) -> Self {
         Self::Processed(
             ctx.state.clone(),
@@ -250,7 +250,7 @@ impl ProcessOutput {
                 path,
                 mimetype: mimetype.into(),
                 types: ctx.types.clone(),
-                dedupe_id: dedupe_id.into(),
+                checksum: checksum.into(),
             }
         )
     }
@@ -262,14 +262,14 @@ impl ProcessOutput {
     /// * `ctx` - The ProcessContext of the processing operation.
     /// * `path` - The path to the output file.
     /// * `mimetype` - The MIME type of the output file.
-    /// * `dedupe_id` - The dupe ID of the output file.
+    /// * `checksum` - The dupe ID of the output file.
     ///
     pub fn embedded(
         ctx: &ProcessContext,
         name: impl Into<String>,
         path: tempfile::TempPath,
         mimetype: impl Into<String>,
-        dedupe_id: impl Into<String>,
+        checksum: impl Into<String>,
     ) -> Self {
         Self::Embedded(
             ctx.state.clone(),
@@ -278,7 +278,7 @@ impl ProcessOutput {
                 path,
                 mimetype: mimetype.into(),
                 types: ctx.types.clone(),
-                dedupe_id: dedupe_id.into(),
+                checksum: checksum.into(),
             },
             ctx.output_sink.clone(),
         )

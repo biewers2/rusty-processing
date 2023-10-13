@@ -9,7 +9,7 @@ pub fn config() -> &'static Config {
     &CONFIG
 }
 
-/// A struct used to define an interface for accessing application-wide configuration values.
+/// A struct used to define an interface for accessing embedded-wide configuration values.
 ///
 #[derive(Debug, Clone, Default)]
 pub struct Config;

@@ -88,10 +88,10 @@ impl ArchiveBuilder {
         Ok(file)
     }
 
-    fn archive_entry_path(&self, embedded_dupe_chain: &[String], name: &str) -> path::PathBuf {
+    fn archive_entry_path(&self, embedded_id_chain: &[String], name: &str) -> path::PathBuf {
         let mut path = path::PathBuf::new();
-        for dedupe_id in embedded_dupe_chain {
-            path.push(dedupe_id);
+        for id in embedded_id_chain {
+            path.push(id);
         }
         path.push(name);
         path

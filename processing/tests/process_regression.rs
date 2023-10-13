@@ -48,7 +48,7 @@ async fn process(mimetype: String, path_str: impl AsRef<str>) -> anyhow::Result<
                 assert_processed_output(expected_dir(&path_str, None), state, data)
             },
             ProcessOutput::Embedded(state, data, _) => {
-                assert_embedded_output(expected_dir(&path_str, Some(&data.dedupe_id)), state, data)
+                assert_embedded_output(expected_dir(&path_str, Some(&data.checksum)), state, data)
             }
         }
     }
@@ -76,11 +76,11 @@ fn assert_embedded_output(expected_dir: path::PathBuf, _state: ProcessState, dat
     assert_identical(expected_path, data.path);
 }
 
-fn expected_dir(path: impl AsRef<str>, dedupe_id: Option<&str>) -> path::PathBuf {
+fn expected_dir(path: impl AsRef<str>, checksum: Option<&str>) -> path::PathBuf {
     let path_str = format!("{}-expected", path.as_ref());
     let path = path::PathBuf::from(path_str);
-    match dedupe_id {
-        Some(dedupe_id) => path.join(dedupe_id),
+    match checksum {
+        Some(checksum) => path.join(checksum),
         None => path
     }
 }

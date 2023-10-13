@@ -1,12 +1,13 @@
 use std::io::{Cursor, Write};
-use std::path::PathBuf;
+use std::path::Path;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use log::{info, warn};
 use mail_parser::mailbox::mbox::{Message, MessageIterator};
 use serde::{Deserialize, Serialize};
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempPath};
+
 use identify::deduplication::dedupe_checksum;
 
 use crate::processing::{Process, ProcessContext, ProcessOutput};
@@ -17,9 +18,9 @@ use crate::processing::{Process, ProcessContext, ProcessOutput};
 /// The processor only writes out embedded messages and doesn't produce any processed output.
 ///
 #[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
-pub struct MboxProcessor;
+pub struct MboxEmbeddedProcessor;
 
-impl MboxProcessor {
+impl MboxEmbeddedProcessor {
     /// Writes a message to the output directory.
     ///
     async fn process_message(&self, ctx: &ProcessContext, message: Message) -> anyhow::Result<ProcessOutput> {
@@ -44,10 +45,16 @@ impl MboxProcessor {
 }
 
 #[async_trait]
-impl Process for MboxProcessor {
-    async fn process(&self, ctx: ProcessContext, path: PathBuf) -> anyhow::Result<()> {
+impl Process for MboxEmbeddedProcessor {
+    async fn process(
+        &self,
+        ctx: &ProcessContext,
+        input_path: &Path,
+        _: Option<TempPath>,
+        _: &str,
+    ) -> anyhow::Result<()> {
         info!("Reading mbox into iterator");
-        let file = std::fs::File::open(path)?;
+        let file = std::fs::File::open(input_path)?;
         let reader = std::io::BufReader::new(file);
         let message_iter = MessageIterator::new(reader);
 
@@ -65,7 +72,7 @@ impl Process for MboxProcessor {
     }
 
     fn name(&self) -> &'static str {
-        "mbox"
+        "Mbox Embedded"
     }
 }
 
@@ -83,16 +90,16 @@ mod tests {
     type ProcessFuture = JoinHandle<anyhow::Result<()>>;
     type OutputReceiver = Receiver<anyhow::Result<ProcessOutput>>;
 
-    fn processor_with_context() -> anyhow::Result<(MboxProcessor, ProcessContext, Receiver<anyhow::Result<ProcessOutput>>)> {
+    fn processor_with_context() -> anyhow::Result<(MboxEmbeddedProcessor, ProcessContext, Receiver<anyhow::Result<ProcessOutput>>)> {
         let (output_sink, outputs) = tokio::sync::mpsc::channel(10);
-        let ctx = ProcessContextBuilder::new("application/mbox", vec![], output_sink).build();
-        Ok((MboxProcessor, ctx, outputs))
+        let ctx = ProcessContextBuilder::new("embedded/mbox", vec![], output_sink).build();
+        Ok((MboxEmbeddedProcessor, ctx, outputs))
     }
 
     fn process(path: path::PathBuf) -> anyhow::Result<(ProcessFuture, OutputReceiver)> {
         let (processor, ctx, output_rx) = processor_with_context()?;
         let proc_fut = tokio::spawn(async move {
-            processor.process(ctx, path).await?;
+            processor.process(&ctx, &path, None, "checksum").await?;
             anyhow::Ok(())
         });
         Ok((proc_fut, output_rx))
@@ -113,18 +120,18 @@ mod tests {
         proc_fut.await??;
 
         // Sort to make the test deterministic
-        outputs.sort_by(|o0, o1| o0.1.dedupe_id.cmp(&o1.1.dedupe_id));
+        outputs.sort_by(|o0, o1| o0.1.checksum.cmp(&o1.1.checksum));
 
         assert_eq!(outputs.len(), 2);
 
         let (state, ctx) = &outputs[0];
         assert_eq!(ctx.mimetype, "message/rfc822");
-        assert_eq!(ctx.dedupe_id, "88dde30cbe134ce0dd8aa0979546646a");
+        assert_eq!(ctx.checksum, "88dde30cbe134ce0dd8aa0979546646a");
         assert!(state.id_chain.is_empty());
 
         let (state, ctx) = &outputs[1];
         assert_eq!(ctx.mimetype, "message/rfc822");
-        assert_eq!(ctx.dedupe_id, "c694e99230b3cbf36d8aef4131596864");
+        assert_eq!(ctx.checksum, "c694e99230b3cbf36d8aef4131596864");
         assert!(state.id_chain.is_empty());
 
         Ok(())

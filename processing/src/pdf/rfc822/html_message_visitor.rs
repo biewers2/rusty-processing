@@ -2,9 +2,8 @@ use std::borrow::Cow;
 
 use html_escape::encode_text;
 use mail_parser::{Addr, ContentType, DateTime, Group};
-
-use crate::message::rfc822::message_formatter::MessageFormatter;
-use crate::message::rfc822::message_visitor::MessageVisitor;
+use crate::pdf::rfc822::message_formatter::MessageFormatter;
+use crate::pdf::rfc822::message_visitor::MessageVisitor;
 
 const HEADERS: [&str; 6] = ["Date", "From", "To", "CC", "BCC", "Subject"];
 
@@ -94,7 +93,7 @@ mod test {
     use mail_parser::MessageParser;
     use test_utils::read_contents;
 
-    use crate::message::rfc822::transformer::MessageTransformer;
+    use crate::pdf::rfc822::transformer::MessageTransformer;
 
     use super::*;
 

@@ -4,11 +4,11 @@ use anyhow::anyhow;
 use mail_parser::Message;
 use services::html_to_pdf;
 
-use crate::message::rfc822::html_message_visitor::HtmlMessageVisitor;
-use crate::message::rfc822::processor::Rfc822Processor;
-use crate::message::rfc822::transformer::MessageTransformer;
+use crate::pdf::rfc822::html_message_visitor::HtmlMessageVisitor;
+use crate::pdf::rfc822::transformer::MessageTransformer;
+use crate::pdf::Rfc822PdfProcessor;
 
-impl Rfc822Processor {
+impl Rfc822PdfProcessor {
     pub async fn render_pdf<W>(&self, message: &Message<'_>, writer: &mut W) -> anyhow::Result<()>
         where W: Write,
     {
