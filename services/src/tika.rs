@@ -10,16 +10,22 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::config;
 
+/// The type of the singleton instance of the `Tika` service.
+///
 pub type TikaService = Box<Tika>;
 
 lazy_static! {
     static ref TIKA: TikaService = Box::<Tika>::default();
 }
 
+/// Returns the singleton instance of the `Tika` service.
+///
 pub fn tika() -> &'static TikaService {
     &TIKA
 }
 
+/// The `Tika` service.
+///
 pub struct Tika {
     http_client: reqwest::Client,
     tika_url: String,
@@ -39,6 +45,8 @@ impl Default for Tika {
 }
 
 impl Tika {
+    /// Checks if the Tika server is running.
+    ///
     pub async fn is_connected(&self) -> bool {
         self.http_client
             .get(self.url("/tika"))
@@ -46,10 +54,20 @@ impl Tika {
             .is_ok()
     }
 
-    pub async fn text(&self, input_path: impl AsRef<Path>) -> anyhow::Result<String> {
+    /// Extracts the text from the input file.
+    ///
+    /// # Arguments
+    ///
+    /// * `input_path` - The path to the input file.
+    ///
+    /// # Returns
+    ///
+    /// The text extracted from the input file.
+    ///
+    pub async fn text(&self, path: impl AsRef<Path>) -> anyhow::Result<String> {
         info!("Using Tika to extract text");
 
-        let response = self.request_text(input_path).await?;
+        let response = self.request_text(path).await?;
         debug!("Tika responded with {}", response.status());
 
         let bytes = response.bytes().await?;
@@ -57,6 +75,17 @@ impl Tika {
         Ok(text)
     }
 
+    /// Extracts the text from the input file and writes it to the output file.
+    ///
+    /// # Arguments
+    ///
+    /// * `input_path` - The path to the input file.
+    /// * `output_path` - The path to the output text file.
+    ///
+    /// # Returns
+    ///
+    /// The text extracted from the input file.
+    ///
     pub async fn text_into_file(&self, input_path: impl AsRef<Path>, output_path: impl AsRef<Path>) -> anyhow::Result<()> {
         info!("Using Tika to extract text");
 
@@ -82,6 +111,16 @@ impl Tika {
             .send().await?)
     }
 
+    /// Extracts the metadata from the input file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the input file.
+    ///
+    /// # Returns
+    ///
+    /// The metadata extracted from the input file.
+    ///
     pub async fn metadata(&self, path: impl AsRef<Path>) -> anyhow::Result<String> {
         info!("Using Tika to extract metadata");
 
@@ -101,7 +140,7 @@ impl Tika {
     ///
     /// # Arguments
     ///
-    /// * `input` - The content representing the file to detect the mimetype of.
+    /// * `path` - The path to the input file.
     ///
     /// # Returns
     ///

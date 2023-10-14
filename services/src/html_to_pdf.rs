@@ -24,25 +24,50 @@ const DEFAULT_ARGS: [&str; 15] = [
     "-",
 ];
 
+/// The type of the singleton instance of the `HtmlToPdf` service.
+///
 pub type HtmlToPdfService = Box<HtmlToPdf>;
 
 lazy_static! {
     static ref HTML_TO_PDF: HtmlToPdfService = Box::<HtmlToPdf>::default();
 }
 
+/// Returns the singleton instance of the `HtmlToPdf` service.
+///
 pub fn html_to_pdf() -> &'static HtmlToPdfService {
     &HTML_TO_PDF
 }
 
+/// The output of the `HtmlToPdf` service.
+///
 pub struct HtmlToPdfOutput {
+    /// The exit status of the call to the `HtmlToPdf` CLI tool.
+    ///
     pub exit_status: ExitStatus,
+
+    /// The stderr of the call to the `HtmlToPdf` CLI tool.
+    ///
     pub error: String,
 }
 
+/// The `HtmlToPdf` service.
+///
 #[derive(Default)]
 pub struct HtmlToPdf;
 
 impl HtmlToPdf {
+    /// Run the `HtmlToPdf` service.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - An asynchronous reader representing HTML content to read into stdin of the `HtmlToPdf` CLI tool.
+    /// * `output` - An asynchronous writer representing PDF content to write from stdout of the `HtmlToPdf` CLI tool.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(HtmlToPdfOutput)` - If the `HtmlToPdf` CLI tool was run successfully.
+    /// * `Err(_)` - If there was an error running the `PdfToImage` CLI tool.
+    ///
     pub async fn run<R, W>(&self, mut input: R, mut output: W) -> anyhow::Result<HtmlToPdfOutput>
     where
         R: AsyncRead + Unpin,

@@ -30,6 +30,8 @@ pub enum ProcessType {
 }
 
 impl ProcessType {
+    /// Returns all possible ProcessTypes.
+    ///
     pub fn all() -> &'static [ProcessType] {
         &[
             ProcessType::Text,

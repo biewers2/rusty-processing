@@ -176,6 +176,7 @@ impl Processor {
 
 /// Creates a temporary file and returns its path.
 ///
+#[inline]
 fn temp_path() -> std::io::Result<TempPath> {
     Ok(NamedTempFile::new()?.into_temp_path())
 }

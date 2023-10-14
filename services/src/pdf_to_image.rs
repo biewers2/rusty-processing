@@ -18,25 +18,50 @@ const DEFAULT_ARGS: [&str; 8] = [
     "-",              // Read input from stdin
 ];
 
+/// The type of the singleton instance of the `PdfToImage` service.
+///
 pub type PdfToImageService = Box<PdfToImage>;
 
 lazy_static! {
     static ref PDF_TO_IMAGE: PdfToImageService = Box::<PdfToImage>::default();
 }
 
+/// Returns the singleton instance of the `PdfToImage` service.
+///
 pub fn pdf_to_image() -> &'static PdfToImageService {
     &PDF_TO_IMAGE
 }
 
+/// The output of the `PdfToImage` service.
+///
 pub struct PdfToImageOutput {
+    /// The exit status of the call to the `PdfToImage` CLI tool.
+    ///
     pub exit_status: ExitStatus,
+
+    /// The stderr of the call to the `PdfToImage` CLI tool.
+    ///
     pub error: String,
 }
 
+/// The `PdfToImage` service.
+///
 #[derive(Default)]
 pub struct PdfToImage {}
 
 impl PdfToImage {
+    /// Run the `PdfToImage` service.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input stream to read the PDF from.
+    /// * `output` - The output stream to write the image to.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(PdfToImageOutput)` - If the `PdfToImage` CLI tool was run successfully.
+    /// * `Err(_)` - If there was an error running the `PdfToImage` CLI tool.
+    ///
     pub async fn run<R, W>(&self, mut input: R, mut output: W) -> anyhow::Result<PdfToImageOutput>
     where
         R: AsyncRead + Unpin,

@@ -5,20 +5,35 @@ use lazy_static::lazy_static;
 
 use crate::{CommandError, no_reader, stream_command, trim_to_string};
 
+/// The type of the singleton instance of the `XdgMime` service.
+///
 pub type XdgMimeService = Box<XdgMime>;
 
 lazy_static! {
     static ref XDG_MIME: XdgMimeService = Box::<XdgMime>::default();
 }
 
+/// Returns the singleton instance of the `xdg-mime` service.
 pub fn xdg_mime() -> &'static XdgMimeService {
     &XDG_MIME
 }
 
+/// The `xdg-mime` service.
+///
 #[derive(Default)]
 pub struct XdgMime;
 
 impl XdgMime {
+    /// Run the `xdg-mime` service to identify the mimetype of a file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file to identify.
+    ///
+    /// # Returns
+    ///
+    /// The mimetype of the file.
+    ///
     pub async fn query_filetype(&self, path: impl AsRef<Path>) -> anyhow::Result<String> {
         let path_str = path.as_ref().to_str().ok_or(anyhow!("failed to convert path to string"))?;
 
