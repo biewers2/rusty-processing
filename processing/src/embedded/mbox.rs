@@ -65,7 +65,7 @@ impl Process for MboxEmbeddedProcessor {
                 warn!("{}", msg);
                 anyhow!(msg)
             })?;
-            let result = self.process_message(&ctx, message).await;
+            let result = self.process_message(ctx, message).await;
             ctx.add_output(result).await?;
         }
         Ok(())

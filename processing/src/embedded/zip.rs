@@ -57,7 +57,7 @@ impl Process for ZipEmbeddedProcessor {
                 Ok(NextArchiveEntry::File(entry)) => {
                     info!("Discovered ZIP file {}", entry.name);
                     let ArchiveEntry { name, path, checksum: dedupe_checksum, mimetype } = entry;
-                    let output = ProcessOutput::embedded(&ctx, name, path, mimetype, dedupe_checksum);
+                    let output = ProcessOutput::embedded(ctx, name, path, mimetype, dedupe_checksum);
                     ctx.add_output(Ok(output)).await?;
                 },
                 Ok(NextArchiveEntry::Dir(name)) => debug!("Discovered ZIP directory {}", name),
@@ -96,7 +96,7 @@ async fn next_archive_entry<R>(archive: &mut ZipArchive<R>, index: usize) -> any
     let mimetype = identify_mimetype(&path).await?.unwrap_or("embedded/octet-stream".to_string());
     let checksum = dedupe_checksum_from_path(&path, &mimetype).await?;
 
-    Ok(NextArchiveEntry::File(ArchiveEntry { name, path, checksum: checksum, mimetype }))
+    Ok(NextArchiveEntry::File(ArchiveEntry { name, path, checksum, mimetype }))
 }
 
 /// Write contents to a temporary file and return the temporary path.

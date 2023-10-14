@@ -97,7 +97,7 @@ impl Processor {
         input_path: PathBuf,
     ) -> Result<(), ProcessingError> {
         let checksum = dedupe_checksum_from_path(&input_path, &ctx.mimetype).await
-            .map_err(|err| ProcessingError::Unexpected(anyhow::Error::from(err)))?;
+            .map_err(|err| ProcessingError::Unexpected(err))?;
 
         let mut futures = vec![];
 
@@ -111,7 +111,7 @@ impl Processor {
             });
         }
 
-        try_join_all(futures).await.map_err(|err| ProcessingError::Unexpected(err))?;
+        try_join_all(futures).await.map_err(ProcessingError::Unexpected)?;
         Ok(())
     }
 
@@ -152,9 +152,7 @@ impl Processor {
     }
 
     fn metadata_processor(&self, mimetype: &str) -> Option<Box<dyn Process>> {
-        match mimetype {
-            _ => Some(Box::<crate::metadata::DefaultMetadataProcessor>::default())
-        }
+        Some(Box::<crate::metadata::DefaultMetadataProcessor>::default())
     }
 
     fn pdf_processor(&self, mimetype: &str) -> Option<Box<dyn Process>> {
