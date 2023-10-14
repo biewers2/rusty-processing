@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
     let types = if args.all {
-        vec![ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf]
+        ProcessType::all().to_vec()
     } else {
         args.types
     };
@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
 /// Process a stream of bytes.
 ///
 /// This function processes a stream of bytes, and returns an archive file
-/// containing the output of the processing operation.
+/// containing the metadata.json of the processing operation.
 ///
 /// # Arguments
 ///
@@ -101,7 +101,7 @@ async fn main() -> anyhow::Result<()> {
 /// # Returns
 ///
 /// * `Ok(File)` - If the stream of bytes was processed successfully, where `File` is the file of the created archive
-///     containing the output files of the processing operation.
+///     containing the metadata.json files of the processing operation.
 /// * `Err(_)` - If there was an error processing the stream of bytes.
 ///
 pub async fn process(
@@ -140,10 +140,10 @@ pub async fn process(
 
 /// Handle the outputs of the processing operation asynchronously.
 ///
-/// Each output received is submitted to a thread pool to be handled on a separate thread. This allows us to
+/// Each metadata.json received is submitted to a thread pool to be handled on a separate thread. This allows us to
 /// continuing receiving processing outputs without blocking.
 ///
-/// Archive entries created from each output is sent to the archive entry sink.
+/// Archive entries created from each metadata.json is sent to the archive entry sink.
 ///
 async fn handle_outputs(
     mut outputs: Receiver<anyhow::Result<ProcessOutput>>,
@@ -165,9 +165,9 @@ async fn handle_outputs(
     Ok(())
 }
 
-/// Handle a single output of the processing operation in an asynchronous scope.
+/// Handle a single metadata.json of the processing operation in an asynchronous scope.
 ///
-/// If the output should be handled recursively (i.e. `recurse = true`), then if it's embedded, the content of the embedded file
+/// If the metadata.json should be handled recursively (i.e. `recurse = true`), then if it's embedded, the content of the embedded file
 /// will also be processed. Otherwise, it will be added as an archive entry and no more processing will occur.
 ///
 async fn handle_output_asynchronously(output: ProcessOutput, recurse: bool, archive_entry_sink: Sender<ArchiveEntry>) {
@@ -183,8 +183,8 @@ async fn handle_output_asynchronously(output: ProcessOutput, recurse: bool, arch
     }
 }
 
-/// If the output is a normal output from the processing operation, then it will be used to create an archive entry.
-/// If the output is an embedded file, then it will be used to create an archive entry AND also be processed.
+/// If the metadata.json is a normal metadata.json from the processing operation, then it will be used to create an archive entry.
+/// If the metadata.json is an embedded file, then it will be used to create an archive entry AND also be processed.
 ///
 async fn handle_process_output_recursively(output: ProcessOutput) -> anyhow::Result<ArchiveEntry> {
     match output {
@@ -214,7 +214,7 @@ async fn handle_process_output_recursively(output: ProcessOutput) -> anyhow::Res
     }
 }
 
-/// Regardless of if the output is normal or an embedded file, both will be used to create an archive entry and no additional
+/// Regardless of if the metadata.json is normal or an embedded file, both will be used to create an archive entry and no additional
 /// processing will occur.
 ///
 async fn handle_process_output(output: ProcessOutput) -> anyhow::Result<ArchiveEntry> {

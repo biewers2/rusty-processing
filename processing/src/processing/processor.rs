@@ -55,7 +55,7 @@ pub(crate) trait Process: Send + Sync {
     ///
     /// * `ctx` - The context of the processing operation.
     /// * `input_path` - The path to the input file.
-    /// * `output_path` - The path to the output file.
+    /// * `output_path` - The path to the metadata.json file.
     ///
     async fn process(
         &self,
@@ -97,7 +97,7 @@ impl Processor {
         input_path: PathBuf,
     ) -> Result<(), ProcessingError> {
         let checksum = dedupe_checksum_from_path(&input_path, &ctx.mimetype).await
-            .map_err(|err| ProcessingError::Unexpected(err))?;
+            .map_err(ProcessingError::Unexpected)?;
 
         let mut futures = vec![];
 
@@ -151,7 +151,7 @@ impl Processor {
         }
     }
 
-    fn metadata_processor(&self, mimetype: &str) -> Option<Box<dyn Process>> {
+    fn metadata_processor(&self, _mimetype: &str) -> Option<Box<dyn Process>> {
         Some(Box::<crate::metadata::DefaultMetadataProcessor>::default())
     }
 

@@ -15,8 +15,6 @@ use services::log_err;
 use crate::activities::download;
 use crate::activities::upload::upload;
 
-static PROCESS_TYPES: [ProcessType; 3] = [ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf];
-
 lazy_static! {
     static ref UPLOADS_POOL: threadpool::ThreadPool = threadpool::ThreadPool::new(100);
     static ref RUNTIME: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
@@ -33,7 +31,7 @@ pub struct ProcessRustyFileInput {
     ///
     source_s3_uri: PathBuf,
 
-    /// The S3 URI of where to write the output archive to.
+    /// The S3 URI of where to write the metadata.json archive to.
     ///
     output_dir_s3_uri: PathBuf,
 
@@ -41,7 +39,7 @@ pub struct ProcessRustyFileInput {
     ///
     mimetype: String,
 
-    /// The types of output to generate.
+    /// The types of metadata.json to generate.
     ///
     types: Vec<ProcessType>,
 }
@@ -127,7 +125,7 @@ async fn handle_outputs(
     let mut processed = vec![];
     let mut embedded = vec![];
     while let Some(output) = outputs.recv().await {
-        debug!("Received output: {:?}", output);
+        debug!("Received metadata.json: {:?}", output);
 
         if let Ok(output) = output.tap(log_err!("Error processing file")) {
             match output {

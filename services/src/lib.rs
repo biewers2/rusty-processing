@@ -131,14 +131,14 @@ where
 
 /// Run a command and return the exit status.
 ///
-/// This function streams the input into stdin, stdout to the output, and stderr to the error asynchronously.
+/// This function streams the input into stdin, stdout to the metadata.json, and stderr to the error asynchronously.
 ///
 /// # Arguments
 ///
 /// * `program` - The program to run.
 /// * `arguments` - The arguments to pass to the program.
 /// * `input` - An asynchronous read to stream into stdin.
-/// * `output` - An asynchronous write to stream stdout into.
+/// * `metadata.json` - An asynchronous write to stream stdout into.
 /// * `error` - An asynchronous write to stream stderr into.
 ///
 /// # Returns

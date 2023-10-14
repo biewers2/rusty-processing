@@ -8,7 +8,7 @@ pub use self::processor::*;
 
 mod processor;
 
-/// The type of output to produce from processing.
+/// The type of metadata.json to produce from processing.
 ///
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub enum ProcessType {
@@ -23,10 +23,21 @@ pub enum ProcessType {
     /// A rendered version of a file as a PDF.
     ///
     Pdf,
-    
+
     /// Files embedded in the original.
     ///
     Embedded
+}
+
+impl ProcessType {
+    pub fn all() -> &'static [ProcessType] {
+        &[
+            ProcessType::Text,
+            ProcessType::Metadata,
+            ProcessType::Pdf,
+            ProcessType::Embedded,
+        ]
+    }
 }
 
 impl FromStr for ProcessType {
@@ -45,7 +56,7 @@ impl FromStr for ProcessType {
 
 /// Represents the state of a processing operation.
 ///
-/// This is built and modified during processing and is provided with the final processing output.
+/// This is built and modified during processing and is provided with the final processing metadata.json.
 ///
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub struct ProcessState {
@@ -68,7 +79,7 @@ pub struct ProcessContext {
     ///
     pub mimetype: String,
 
-    /// The types of output to generate.
+    /// The types of metadata.json to generate.
     ///
     pub types: Vec<ProcessType>,
 
@@ -93,7 +104,7 @@ impl ProcessContext {
         }
     }
 
-    /// Adds an output to be sent through the output transfer channel created by the caller of the processing operation.
+    /// Adds an metadata.json to be sent through the metadata.json transfer channel created by the caller of the processing operation.
     ///
     pub async fn add_output(&self, result: anyhow::Result<ProcessOutput>) -> anyhow::Result<()> {
         self.output_sink.send(result).await
@@ -120,13 +131,13 @@ pub struct ProcessContextBuilder {
 }
 
 impl ProcessContextBuilder {
-    /// Creates a new ProcessContextBuilder with the given MIME type, types of files to process, and output transfer channel.
+    /// Creates a new ProcessContextBuilder with the given MIME type, types of files to process, and metadata.json transfer channel.
     ///
     /// # Arguments
     ///
     /// * `mimetype` - The MIME type of the file to process.
-    /// * `types` - The types of output to generate.
-    /// * `output_sink` - The output transfer channel created by the caller of the processing operation.
+    /// * `types` - The types of metadata.json to generate.
+    /// * `output_sink` - The metadata.json transfer channel created by the caller of the processing operation.
     ///
     pub fn new(
         mimetype: impl Into<String>,
@@ -150,7 +161,7 @@ impl ProcessContextBuilder {
         self
     }
 
-    /// Set the types of output to generate.
+    /// Set the types of metadata.json to generate.
     ///
     pub fn types(mut self, types: Vec<ProcessType>) -> Self {
         self.types = types;
@@ -189,7 +200,7 @@ impl From<ProcessContext> for ProcessContextBuilder {
     }
 }
 
-/// Representation of the output of processing a file.
+/// Representation of the metadata.json of processing a file.
 ///
 /// It can be either a new file or an embedded file.
 ///
@@ -210,23 +221,23 @@ pub enum ProcessOutput {
 ///
 #[derive(Debug)]
 pub struct ProcessOutputData {
-    /// The name to give the output file.
+    /// The name to give the metadata.json file.
     ///
     pub name: String,
 
-    /// The output file.
+    /// The metadata.json file.
     ///
     pub path: tempfile::TempPath,
 
-    /// Mimetype of the output file.
+    /// Mimetype of the metadata.json file.
     ///
     pub mimetype: String,
 
-    /// The types of output generated.
+    /// The types of metadata.json generated.
     ///
     pub types: Vec<ProcessType>,
 
-    /// Deduplication ID of the output file.
+    /// Deduplication ID of the metadata.json file.
     ///
     pub checksum: String,
 }
@@ -237,9 +248,9 @@ impl ProcessOutput {
     /// # Arguments
     ///
     /// * `ctx` - The ProcessContext of the processing operation.
-    /// * `path` - The path to the output file.
-    /// * `mimetype` - The MIME type of the output file.
-    /// * `checksum` - The dupe ID of the output file.
+    /// * `path` - The path to the metadata.json file.
+    /// * `mimetype` - The MIME type of the metadata.json file.
+    /// * `checksum` - The dupe ID of the metadata.json file.
     ///
     pub fn processed(
         ctx: &ProcessContext,
@@ -265,9 +276,9 @@ impl ProcessOutput {
     /// # Arguments
     ///
     /// * `ctx` - The ProcessContext of the processing operation.
-    /// * `path` - The path to the output file.
-    /// * `mimetype` - The MIME type of the output file.
-    /// * `checksum` - The dupe ID of the output file.
+    /// * `path` - The path to the metadata.json file.
+    /// * `mimetype` - The MIME type of the metadata.json file.
+    /// * `checksum` - The dupe ID of the metadata.json file.
     ///
     pub fn embedded(
         ctx: &ProcessContext,

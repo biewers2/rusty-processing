@@ -15,13 +15,13 @@ use crate::processing::{Process, ProcessContext, ProcessOutput};
 /// MboxProcessor is responsible for processing mbox files.
 ///
 /// Internally it uses the `mail_parser` crate to parse the mbox file.
-/// The processor only writes out embedded messages and doesn't produce any processed output.
+/// The processor only writes out embedded messages and doesn't produce any processed metadata.json.
 ///
 #[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub struct MboxEmbeddedProcessor;
 
 impl MboxEmbeddedProcessor {
-    /// Writes a message to the output directory.
+    /// Writes a message to the metadata.json directory.
     ///
     async fn process_message(&self, ctx: &ProcessContext, message: Message) -> anyhow::Result<ProcessOutput> {
         let mut file = NamedTempFile::new()?;
@@ -82,6 +82,7 @@ mod tests {
 
     use tokio::sync::mpsc::Receiver;
     use tokio::task::JoinHandle;
+    use test_utils::temp_path;
 
     use crate::processing::ProcessContextBuilder;
 
@@ -99,7 +100,7 @@ mod tests {
     fn process(path: path::PathBuf) -> anyhow::Result<(ProcessFuture, OutputReceiver)> {
         let (processor, ctx, output_rx) = processor_with_context()?;
         let proc_fut = tokio::spawn(async move {
-            processor.process(&ctx, &path, None, "checksum").await?;
+            processor.process(&ctx, &path, temp_path()?, "checksum").await?;
             anyhow::Ok(())
         });
         Ok((proc_fut, output_rx))
@@ -113,7 +114,7 @@ mod tests {
         let mut outputs = vec![];
         while let Some(output) = output_rx.recv().await {
             match output? {
-                ProcessOutput::Processed(_, _) => panic!("Expected embedded output"),
+                ProcessOutput::Processed(_, _) => panic!("Expected embedded metadata.json"),
                 ProcessOutput::Embedded(state, data, _) => outputs.push((state, data))
             }
         }
@@ -145,7 +146,7 @@ mod tests {
         let mut output_count = 0;
         while let Some(output) = output_rx.recv().await {
             match output? {
-                ProcessOutput::Processed(_, _) => panic!("Expected embedded output"),
+                ProcessOutput::Processed(_, _) => panic!("Expected embedded metadata.json"),
                 ProcessOutput::Embedded(_, data, _) => {
                     output_count += 1;
                     assert_eq!(data.mimetype, "message/rfc822");

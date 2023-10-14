@@ -9,6 +9,7 @@ use std::path::Path;
 use std::pin::Pin;
 use bytes::Bytes;
 use rand::Rng;
+use tempfile::{NamedTempFile, TempPath};
 use tokio::io;
 use tokio::io::AsyncReadExt;
 use tokio_stream::Stream;
@@ -55,6 +56,10 @@ pub fn random_byte_stream(len: usize) -> (Bytes, ByteStream) {
 pub fn string_as_byte_stream(value: impl Into<String>) -> ByteStream {
     let bytes = Bytes::from(value.into());
     Box::pin(async_stream::stream! { yield bytes })
+}
+
+pub fn temp_path() -> std::io::Result<TempPath> {
+    Ok(NamedTempFile::new()?.into_temp_path())
 }
 
 #[cfg(test)]

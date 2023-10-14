@@ -1,4 +1,5 @@
 use std::{fs, path};
+use anyhow::anyhow;
 
 use serde::Deserialize;
 
@@ -53,7 +54,7 @@ async fn process(mimetype: String, path_str: impl AsRef<str>) -> anyhow::Result<
         }
     }
 
-    processing.await??;
+    processing.await?.map_err(|err| anyhow!("Failed to process {}: {:?}", path_str.as_ref(), err))?;
     Ok(())
 }
 

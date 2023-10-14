@@ -8,13 +8,13 @@ use crate::{stream_command, trim_to_string};
 const PROGRAM: &str = "gs";
 
 const DEFAULT_ARGS: [&str; 8] = [
-    "-q",             // No program output to stdout
+    "-q",             // No program metadata.json to stdout
     "-dNOPAUSE",      // Disable prompt/pause after end of each page
     "-dBATCH",        // Exit after operation exits
     "-dSAFER",        // Activate sandboxing; prevent I/O access outside specified files
     "-r300",          //
     "-sDEVICE=jpeg",  // Use JPEG image format
-    "-sOutputFile=-", // Send output to stdout
+    "-sOutputFile=-", // Send metadata.json to stdout
     "-",              // Read input from stdin
 ];
 
