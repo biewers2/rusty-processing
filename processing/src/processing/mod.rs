@@ -23,6 +23,10 @@ pub enum ProcessType {
     /// A rendered version of a file as a PDF.
     ///
     Pdf,
+    
+    /// Files embedded in the original.
+    ///
+    Embedded
 }
 
 impl FromStr for ProcessType {
@@ -33,6 +37,7 @@ impl FromStr for ProcessType {
             "text" => Ok(ProcessType::Text),
             "metadata" => Ok(ProcessType::Metadata),
             "pdf" => Ok(ProcessType::Pdf),
+            "embedded" => Ok(ProcessType::Embedded),
             _ => Err(format!("Can not convert {} to OutputType", s)),
         }
     }

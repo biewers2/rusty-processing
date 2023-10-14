@@ -13,21 +13,18 @@ impl Process for DefaultMetadataProcessor {
         &self,
         ctx: &ProcessContext,
         input_path: &Path,
-        output_path: Option<TempPath>,
+        output_path: TempPath,
         checksum: &str,
     ) -> anyhow::Result<()> {
-        if let Some(path) = output_path {
-            let result = async {
-                let mut metadata = tika().metadata(input_path).await?;
-                tokio::fs::write(&path, &mut metadata).await?;
+        let result = async {
+            let mut metadata = tika().metadata(input_path).await?;
+            tokio::fs::write(&output_path, &mut metadata).await?;
 
-                let output = ProcessOutput::processed(ctx, "metadata.json", path, "embedded/json", checksum);
-                anyhow::Ok(output)
-            }.await;
+            let output = ProcessOutput::processed(ctx, "metadata.json", output_path, "embedded/json", checksum);
+            anyhow::Ok(output)
+        }.await;
 
-            ctx.add_output(result).await?;
-        }
-        Ok(())
+        ctx.add_output(result).await
     }
 
     fn name(&self) -> &'static str {

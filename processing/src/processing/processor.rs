@@ -5,12 +5,11 @@ use async_trait::async_trait;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use tempfile::TempPath;
+use tempfile::{NamedTempFile, TempPath};
 
 use identify::deduplication::dedupe_checksum_from_path;
 
-use crate::build_paths_from_types;
-use crate::processing::ProcessContext;
+use crate::processing::{ProcessContext, ProcessType};
 
 lazy_static! {
     static ref PROCESSOR: Processor = Processor;
@@ -62,7 +61,7 @@ pub(crate) trait Process: Send + Sync {
         &self,
         ctx: &ProcessContext,
         input_path: &Path,
-        output_path: Option<TempPath>,
+        output_path: TempPath,
         checksum: &str,
     ) -> anyhow::Result<()>;
 
@@ -100,31 +99,47 @@ impl Processor {
         let checksum = dedupe_checksum_from_path(&input_path, &ctx.mimetype).await
             .map_err(|err| ProcessingError::Unexpected(anyhow::Error::from(err)))?;
 
-        let paths = build_paths_from_types(&ctx.types)
-            .map_err(|err| ProcessingError::Unexpected(anyhow::Error::from(err)))?;
-
         let mut futures = vec![];
-        let processes = vec![
-            (self.text_processor(&ctx.mimetype), paths.text),
-            (self.metadata_processor(&ctx.mimetype), paths.metadata),
-            (self.pdf_processor(&ctx.mimetype), paths.pdf),
-            (self.embedded_processor(&ctx.mimetype), None),
-        ];
 
-        for (processor, path) in processes {
-            if let Some(processor) = processor {
-                let ctx_ref = &ctx;
-                let input_path_ref = &input_path;
-                let checksum = &checksum;
+        for processor in self.determine_processors(&ctx.mimetype, &ctx.types) {
+            let ctx_ref = &ctx;
+            let input_path_ref = &input_path;
+            let checksum = &checksum;
 
-                futures.push(async move {
-                    processor.process(ctx_ref, input_path_ref, path, checksum).await
-                });
-            }
+            futures.push(async move {
+                processor.process(ctx_ref, input_path_ref, temp_path()?, checksum).await
+            });
         }
 
         try_join_all(futures).await.map_err(|err| ProcessingError::Unexpected(err))?;
         Ok(())
+    }
+
+    fn determine_processors(&self, mimetype: &str, types: &[ProcessType]) -> Vec<Box<dyn Process>> {
+        let mut processors = vec![];
+
+        if types.contains(&ProcessType::Text) {
+            if let Some(processor) = self.text_processor(mimetype) {
+                processors.push(processor);
+            }
+        }
+        if types.contains(&ProcessType::Metadata) {
+            if let Some(processor) = self.metadata_processor(mimetype) {
+                processors.push(processor);
+            }
+        }
+        if types.contains(&ProcessType::Pdf) {
+            if let Some(processor) = self.pdf_processor(mimetype) {
+                processors.push(processor);
+            }
+        }
+        if types.contains(&ProcessType::Embedded) {
+            if let Some(processor) = self.embedded_processor(mimetype) {
+                processors.push(processor);
+            }
+        }
+
+        processors
     }
 
     fn text_processor(&self, mimetype: &str) -> Option<Box<dyn Process>> {
@@ -159,4 +174,10 @@ impl Processor {
             _ => None
         }
     }
+}
+
+/// Creates a temporary file and returns its path.
+///
+fn temp_path() -> std::io::Result<TempPath> {
+    Ok(NamedTempFile::new()?.into_temp_path())
 }

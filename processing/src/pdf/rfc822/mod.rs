@@ -27,21 +27,18 @@ impl Process for Rfc822PdfProcessor {
         &self,
         ctx: &ProcessContext,
         input_path: &Path,
-        output_path: Option<TempPath>,
+        output_path: TempPath,
         checksum: &str,
     ) -> anyhow::Result<()> {
-        if let Some(path) = output_path {
-            let content = std::fs::read(input_path)?;
-            let message = self.message_parser.parse(&content)
-                .ok_or(anyhow!("Failed to parse message"))?;
+        let content = std::fs::read(input_path)?;
+        let message = self.message_parser.parse(&content)
+            .ok_or(anyhow!("Failed to parse message"))?;
 
-            let mut writer = File::create(&path)?;
-            let result = self.render_pdf(&message, &mut writer).await.map(|_|
-                ProcessOutput::processed(ctx, "rendered.pdf", path, "embedded/pdf", checksum)
-            );
-            ctx.add_output(result).await?;
-        }
-        Ok(())
+        let mut writer = File::create(&output_path)?;
+        let result = self.render_pdf(&message, &mut writer).await.map(|_|
+            ProcessOutput::processed(ctx, "rendered.pdf", output_path, "embedded/pdf", checksum)
+        );
+        ctx.add_output(result).await
     }
 
 

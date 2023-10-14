@@ -50,7 +50,7 @@ impl Process for MboxEmbeddedProcessor {
         &self,
         ctx: &ProcessContext,
         input_path: &Path,
-        _: Option<TempPath>,
+        _: TempPath,
         _: &str,
     ) -> anyhow::Result<()> {
         info!("Reading mbox into iterator");

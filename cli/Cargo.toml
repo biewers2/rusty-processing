@@ -6,7 +6,11 @@ edition = "2021"
 [dependencies]
 anyhow = { version = "~1.0", features = ["backtrace"] }
 clap = { version = "~4.4.0", features = ["derive"] }
+lazy_static = "1.4"
 log = "0.4"
 processing = { version = "0.1", path = "../processing" }
+services = { version = "0.1", path = "../services" }
 simple_logger = "4.2"
+tap = "1.0"
+threadpool = "1.8"
 tokio = "1.32"

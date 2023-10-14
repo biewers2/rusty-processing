@@ -36,7 +36,7 @@ impl Process for ZipEmbeddedProcessor {
         &self,
         ctx: &ProcessContext,
         path:&Path,
-        _: Option<TempPath>,
+        _: TempPath,
         _: &str,
     ) -> anyhow::Result<()> {
         info!("Opening zip file");

@@ -16,17 +16,13 @@ impl Process for DefaultTextProcessor {
         &self,
         ctx: &ProcessContext,
         input_path: &Path,
-        output_path: Option<TempPath>,
+        output_path: TempPath,
         checksum: &str,
     ) -> anyhow::Result<()> {
-        if let Some(path) = output_path {
-            tika().text_into_file(input_path, &path).await?;
+        tika().text_into_file(input_path, &output_path).await?;
 
-            let output = ProcessOutput::processed(ctx, "extracted.txt", path, "text/plain", checksum);
-            ctx.add_output(Ok(output)).await?;
-        }
-
-        Ok(())
+        let output = ProcessOutput::processed(ctx, "extracted.txt", output_path, "text/plain", checksum);
+        ctx.add_output(Ok(output)).await
     }
 
     fn name(&self) -> &'static str {

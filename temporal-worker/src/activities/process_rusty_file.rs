@@ -10,7 +10,6 @@ use temporal_sdk::{ActContext, NonRetryableActivityError};
 use tokio::sync::mpsc::Receiver;
 
 use processing::processing::{ProcessContextBuilder, ProcessingError, processor, ProcessOutput, ProcessType};
-use processing::runtime;
 use services::log_err;
 
 use crate::activities::download;
@@ -19,7 +18,11 @@ use crate::activities::upload::upload;
 static PROCESS_TYPES: [ProcessType; 3] = [ProcessType::Text, ProcessType::Metadata, ProcessType::Pdf];
 
 lazy_static! {
-    static ref THREAD_POOL: threadpool::ThreadPool = threadpool::ThreadPool::new(100);
+    static ref UPLOADS_POOL: threadpool::ThreadPool = threadpool::ThreadPool::new(100);
+    static ref RUNTIME: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to create tokio runtime");
 }
 
 /// Input to the `process_rusty_file` activity.
@@ -37,13 +40,19 @@ pub struct ProcessRustyFileInput {
     /// The MIME type of the file to process.
     ///
     mimetype: String,
+
+    /// The types of output to generate.
+    ///
+    types: Vec<ProcessType>,
 }
 
 /// Output from the `process_rusty_file` activity.
 ///
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessRustyFileOutput {
-    files: Vec<FileInfo>,
+    original_s3_uri: PathBuf,
+    processed_files: Vec<FileInfo>,
+    embedded_files: Vec<FileInfo>,
 }
 
 /// Information about a file.
@@ -77,11 +86,11 @@ pub async fn process_rusty_file(
     let (output_sink, outputs) = tokio::sync::mpsc::channel(100);
     let ctx = ProcessContextBuilder::new(
         input.mimetype,
-        PROCESS_TYPES.to_vec(),
+        input.types,
         output_sink,
     ).build();
 
-    let s3_uri = input.source_s3_uri;
+    let s3_uri = &input.source_s3_uri;
     let path = download(&s3_uri).await
         .tap(log_err!("Failed to download from S3 URI {}", s3_uri.to_string_lossy()))?;
 
@@ -99,57 +108,59 @@ pub async fn process_rusty_file(
             }
         })?;
 
-    let files = files.await?;
-    Ok(ProcessRustyFileOutput { files })
+    let (processed, embedded) = files.await?;
+    UPLOADS_POOL.join();
+
+    Ok(ProcessRustyFileOutput {
+        original_s3_uri: input.source_s3_uri,
+        processed_files: processed,
+        embedded_files: embedded,
+    })
 }
 
 async fn handle_outputs(
     mut outputs: Receiver<anyhow::Result<ProcessOutput>>,
     output_dir_s3_uri: impl AsRef<Path>
-) -> Vec<FileInfo> {
+) -> (Vec<FileInfo>, Vec<FileInfo>) {
     info!("Handling outputs");
 
-    let mut files = vec![];
+    let mut processed = vec![];
+    let mut embedded = vec![];
     while let Some(output) = outputs.recv().await {
         debug!("Received output: {:?}", output);
 
         if let Ok(output) = output.tap(log_err!("Error processing file")) {
-            if let Some(file_info) = handle_output(output, &output_dir_s3_uri).await {
-                files.push(file_info);
+            match output {
+                ProcessOutput::Processed(_, data) => {
+                    let s3_uri = output_dir_s3_uri.as_ref().join(data.name);
+                    submit_upload(data.path, &s3_uri);
+                    processed.push(FileInfo {
+                        s3_uri,
+                        mimetype: data.mimetype,
+                        id: data.checksum,
+                    })
+                },
+
+                ProcessOutput::Embedded(_, data, _) => {
+                    let s3_uri = output_dir_s3_uri.as_ref().join(&data.checksum).join(&data.name);
+                    submit_upload(data.path, &s3_uri);
+                    embedded.push(FileInfo {
+                        s3_uri,
+                        mimetype: data.mimetype,
+                        id: data.checksum,
+                    })
+                }
             }
         }
     }
 
-    files
-}
-
-async fn handle_output(
-    output: ProcessOutput,
-    output_dir_s3_uri: impl AsRef<Path>
-) -> Option<FileInfo> {
-    match output {
-        ProcessOutput::Processed(_, data) => {
-            let s3_uri = output_dir_s3_uri.as_ref().join(data.name);
-            submit_upload(data.path, s3_uri);
-            None
-        },
-
-        ProcessOutput::Embedded(_, data, _) => {
-            let s3_uri = output_dir_s3_uri.as_ref().join(&data.checksum).join(&data.name);
-            submit_upload(data.path, &s3_uri);
-            Some(FileInfo {
-                s3_uri,
-                mimetype: data.mimetype,
-                id: data.checksum,
-            })
-        }
-    }
+    (processed, embedded)
 }
 
 fn submit_upload(path: TempPath, s3_uri: impl Into<PathBuf>) {
     let s3_uri = s3_uri.into();
-    THREAD_POOL.execute(move ||
-        runtime().block_on(upload(path, s3_uri))
+    UPLOADS_POOL.execute(move ||
+        RUNTIME.block_on(upload(path, s3_uri))
             .tap(log_err!("Failed to upload file"))
             .unwrap()
     );

@@ -23,7 +23,7 @@ impl Process for Rfc822EmbeddedProcessor {
         &self,
         ctx: &ProcessContext,
         input_path: &Path,
-        _: Option<TempPath>,
+        _: TempPath,
         _: &str,
     ) -> anyhow::Result<()> {
         let content = std::fs::read(input_path)?;
