@@ -59,7 +59,7 @@ pub(crate) trait Process: Send + Sync {
     ///
     async fn process(
         &self,
-        ctx: &ProcessContext,
+        ctx: ProcessContext,
         input_path: &Path,
         output_path: TempPath,
         checksum: &str,
@@ -100,17 +100,15 @@ impl Processor {
             .map_err(ProcessingError::Unexpected)?;
 
         let mut futures = vec![];
-
         for processor in self.determine_processors(&ctx.mimetype, &ctx.types) {
-            let ctx_ref = &ctx;
+            let inner_ctx = ctx.clone();
             let input_path_ref = &input_path;
             let checksum = &checksum;
 
             futures.push(async move {
-                processor.process(ctx_ref, input_path_ref, temp_path()?, checksum).await
+                processor.process(inner_ctx, input_path_ref, temp_path()?, checksum).await
             });
         }
-
         try_join_all(futures).await.map_err(ProcessingError::Unexpected)?;
         Ok(())
     }
@@ -144,6 +142,10 @@ impl Processor {
 
     fn text_processor(&self, mimetype: &str) -> Option<Box<dyn Process>> {
         match mimetype {
+            "text/plain " |
+            "text/css" |
+            "text/csv" |
+            "text/javascript" |
             "application/zip" |
             "application/mbox" => None,
 

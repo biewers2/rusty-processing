@@ -25,7 +25,7 @@ pub struct Rfc822PdfProcessor {
 impl Process for Rfc822PdfProcessor {
     async fn process(
         &self,
-        ctx: &ProcessContext,
+        ctx: ProcessContext,
         input_path: &Path,
         output_path: TempPath,
         checksum: &str,
@@ -36,7 +36,7 @@ impl Process for Rfc822PdfProcessor {
 
         let mut writer = File::create(&output_path)?;
         let result = self.render_pdf(&message, &mut writer).await.map(|_|
-            ProcessOutput::processed(ctx, "rendered.pdf", output_path, "embedded/pdf", checksum)
+            ProcessOutput::processed(&ctx, "rendered.pdf", output_path, "embedded/pdf", checksum)
         );
         ctx.add_output(result).await
     }

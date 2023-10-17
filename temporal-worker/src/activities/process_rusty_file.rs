@@ -1,45 +1,33 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Error};
-use lazy_static::lazy_static;
-use log::{debug, info};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use tap::Tap;
-use tempfile::TempPath;
 use temporal_sdk::{ActContext, NonRetryableActivityError};
 use tokio::sync::mpsc::Receiver;
 
 use processing::processing::{ProcessContextBuilder, ProcessingError, processor, ProcessOutput, ProcessType};
 use services::log_err;
 
-use crate::activities::download;
-use crate::activities::upload::upload;
-
-lazy_static! {
-    static ref UPLOADS_POOL: threadpool::ThreadPool = threadpool::ThreadPool::new(100);
-    static ref RUNTIME: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("Failed to create tokio runtime");
-}
-
 /// Input to the `process_rusty_file` activity.
 ///
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessRustyFileInput {
-    /// The S3 URI of the file to process.
+    /// The local path to the file to process.
     ///
-    source_s3_uri: PathBuf,
+    path: PathBuf,
 
-    /// The S3 URI of where to write the metadata.json archive to.
+    /// The local path to the directory where output files should be written to.
     ///
-    output_dir_s3_uri: PathBuf,
+    directory: PathBuf,
 
     /// The MIME type of the file to process.
     ///
     mimetype: String,
 
-    /// The types of metadata.json to generate.
+    /// The types of output to generate.
     ///
     types: Vec<ProcessType>,
 }
@@ -48,8 +36,14 @@ pub struct ProcessRustyFileInput {
 ///
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessRustyFileOutput {
-    original_s3_uri: PathBuf,
+    /// Files that were processed.
+    ///
+    /// These files are created during processing and should not be treated as embedded.
+    ///
     processed_files: Vec<FileInfo>,
+
+    /// Files that were embedded in the original file.
+    ///
     embedded_files: Vec<FileInfo>,
 }
 
@@ -57,9 +51,9 @@ pub struct ProcessRustyFileOutput {
 ///
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileInfo {
-    /// The S3 URI of the file.
+    /// The path of the file on the local machine.
     ///
-    s3_uri: PathBuf,
+    path: PathBuf,
 
     /// The MIME type of the file.
     ///
@@ -79,7 +73,7 @@ pub async fn process_rusty_file(
     _ctx: ActContext,
     input: ProcessRustyFileInput,
 ) -> anyhow::Result<ProcessRustyFileOutput> {
-    info!("Processing rusty file: {:?}", input);
+    info!("Processing rusty file '{:?}'", input);
 
     let (output_sink, outputs) = tokio::sync::mpsc::channel(100);
     let ctx = ProcessContextBuilder::new(
@@ -88,29 +82,26 @@ pub async fn process_rusty_file(
         output_sink,
     ).build();
 
-    let s3_uri = &input.source_s3_uri;
-    let path = download(&s3_uri).await
-        .tap(log_err!("Failed to download from S3 URI {}", s3_uri.to_string_lossy()))?;
-
-    let processing = tokio::spawn(processor().process(ctx, path.to_path_buf()));
-    let files = tokio::spawn(handle_outputs(outputs, input.output_dir_s3_uri));
+    let processing = tokio::spawn(processor().process(ctx, input.path));
+    let files = tokio::spawn(handle_outputs(outputs, input.directory));
 
     processing.await?
-        .tap(log_err!("Failed to process file {}", s3_uri.to_string_lossy()))
+        .tap(log_err!("Failed to process file"))
         .map_err(|err| {
             match err {
                 ProcessingError::UnsupportedMimeType(_) => {
+                    error!("Retryable error: {}", err);
                     Error::from(NonRetryableActivityError(anyhow!(format!("{}", err))))
                 },
-                ProcessingError::Unexpected(err) => err
+                ProcessingError::Unexpected(err) => {
+                    error!("Unexpected error: {:?}", err);
+                    err
+                }
             }
         })?;
 
-    let (processed, embedded) = files.await?;
-    UPLOADS_POOL.join();
-
+    let (processed, embedded) = files.await??;
     Ok(ProcessRustyFileOutput {
-        original_s3_uri: input.source_s3_uri,
         processed_files: processed,
         embedded_files: embedded,
     })
@@ -118,9 +109,10 @@ pub async fn process_rusty_file(
 
 async fn handle_outputs(
     mut outputs: Receiver<anyhow::Result<ProcessOutput>>,
-    output_dir_s3_uri: impl AsRef<Path>
-) -> (Vec<FileInfo>, Vec<FileInfo>) {
+    output_dir: impl AsRef<Path>
+) -> anyhow::Result<(Vec<FileInfo>, Vec<FileInfo>)> {
     info!("Handling outputs");
+    let output_dir = output_dir.as_ref();
 
     let mut processed = vec![];
     let mut embedded = vec![];
@@ -130,20 +122,26 @@ async fn handle_outputs(
         if let Ok(output) = output.tap(log_err!("Error processing file")) {
             match output {
                 ProcessOutput::Processed(_, data) => {
-                    let s3_uri = output_dir_s3_uri.as_ref().join(data.name);
-                    submit_upload(data.path, &s3_uri);
+                    let output_path = output_dir.join(data.name);
+                    fs::create_dir_all(&output_path.parent().unwrap())
+                        .and(fs::copy(&data.path, &output_path))
+                        .tap(log_err!("Failed to copy file to output directory"))?;
+
                     processed.push(FileInfo {
-                        s3_uri,
+                        path: output_path,
                         mimetype: data.mimetype,
                         id: data.checksum,
                     })
                 },
 
                 ProcessOutput::Embedded(_, data, _) => {
-                    let s3_uri = output_dir_s3_uri.as_ref().join(&data.checksum).join(&data.name);
-                    submit_upload(data.path, &s3_uri);
+                    let output_path = output_dir.join(&data.checksum).join(&data.name);
+                    fs::create_dir_all(&output_path.parent().unwrap())
+                        .and(fs::copy(&data.path, &output_path))
+                        .tap(log_err!("Failed to copy file to output directory"))?;
+
                     embedded.push(FileInfo {
-                        s3_uri,
+                        path: output_path,
                         mimetype: data.mimetype,
                         id: data.checksum,
                     })
@@ -152,14 +150,5 @@ async fn handle_outputs(
         }
     }
 
-    (processed, embedded)
-}
-
-fn submit_upload(path: TempPath, s3_uri: impl Into<PathBuf>) {
-    let s3_uri = s3_uri.into();
-    UPLOADS_POOL.execute(move ||
-        RUNTIME.block_on(upload(path, s3_uri))
-            .tap(log_err!("Failed to upload file"))
-            .unwrap()
-    );
+    Ok((processed, embedded))
 }

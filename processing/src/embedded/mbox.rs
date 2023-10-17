@@ -48,7 +48,7 @@ impl MboxEmbeddedProcessor {
 impl Process for MboxEmbeddedProcessor {
     async fn process(
         &self,
-        ctx: &ProcessContext,
+        ctx: ProcessContext,
         input_path: &Path,
         _: TempPath,
         _: &str,
@@ -65,7 +65,7 @@ impl Process for MboxEmbeddedProcessor {
                 warn!("{}", msg);
                 anyhow!(msg)
             })?;
-            let result = self.process_message(ctx, message).await;
+            let result = self.process_message(&ctx, message).await;
             ctx.add_output(result).await?;
         }
         Ok(())
@@ -100,7 +100,7 @@ mod tests {
     fn process(path: path::PathBuf) -> anyhow::Result<(ProcessFuture, OutputReceiver)> {
         let (processor, ctx, output_rx) = processor_with_context()?;
         let proc_fut = tokio::spawn(async move {
-            processor.process(&ctx, &path, temp_path()?, "checksum").await?;
+            processor.process(ctx, &path, temp_path()?, "checksum").await?;
             anyhow::Ok(())
         });
         Ok((proc_fut, output_rx))

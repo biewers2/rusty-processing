@@ -1,19 +1,28 @@
-use std::path::Path;
-use tempfile::{NamedTempFile, TempPath};
+use std::path::PathBuf;
 
-use crate::services::s3_client;
+use serde::{Deserialize, Serialize};
+use temporal_sdk::ActContext;
+use crate::s3_client;
+
 use crate::util::parse_s3_uri;
 
-/// TODO | Make this an activity part of an overall "Process Rusty File" Workflow once
-/// TODO | the Temporal Rust SDK stabilizes workflow definitions.
+/// Input to the `download` activity.
 /// 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadInput {
+    /// The S3 URI to download the file from.
+    /// 
+    pub s3_uri: String,
+    
+    /// The local path to where the file should be downloaded to.
+    /// 
+    pub path: PathBuf,
+}
+
 /// Activity for downloading a file from S3.
 /// 
-/// This activity downloads a file from S3 and returns a temporary path to the
-/// downloaded file.
-/// 
-pub async fn download(s3_uri: impl AsRef<Path>) -> anyhow::Result<TempPath> {
-    let (bucket, key) = parse_s3_uri(s3_uri)?;
+pub async fn download(_ctx: ActContext, input: DownloadInput) -> anyhow::Result<()> {
+    let (bucket, key) = parse_s3_uri(input.s3_uri)?;
     let object = s3_client().await
         .get_object()
         .bucket(bucket)
@@ -21,10 +30,8 @@ pub async fn download(s3_uri: impl AsRef<Path>) -> anyhow::Result<TempPath> {
         .send()
         .await?;
 
-    let path = NamedTempFile::new()?.into_temp_path();
-    let mut file = tokio::fs::File::create(&path).await?;
+    let mut file = tokio::fs::File::create(&input.path).await?;
     let mut body = object.body.into_async_read();
     tokio::io::copy(&mut body, &mut file).await?;
-
-    Ok(path)
+    Ok(())
 }

@@ -12,6 +12,7 @@ aws-config = { version = "0.56" }
 aws-sdk-s3 = { version = "0.33", default-features = false, features = ["rt-tokio"] }
 bytesize = "1"
 futures = { version = "0.3", features = ["executor"] }
+gethostname = "0.4"
 lazy_static = "1.4"
 log = "0.4"
 processing = { version = "0.1",  path = "../processing", features = ["mail"] }
@@ -21,6 +22,9 @@ services = { version = "0.1", path = "../services" }
 simple_logger = "4.2"
 tap = "1.0"
 tempfile = "3.8"
+#temporal-sdk = { path = "../../../sdk-core/sdk" }
+#temporal-sdk-core = { path = "../../../sdk-core/core" }
+#temporal-sdk-core-api = { path = "../../../sdk-core/core-api" }
 temporal-sdk = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core-api = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }

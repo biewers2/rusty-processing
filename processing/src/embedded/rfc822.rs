@@ -21,7 +21,7 @@ pub struct Rfc822EmbeddedProcessor {
 impl Process for Rfc822EmbeddedProcessor {
     async fn process(
         &self,
-        ctx: &ProcessContext,
+        ctx: ProcessContext,
         input_path: &Path,
         _: TempPath,
         _: &str,
@@ -46,7 +46,7 @@ impl Process for Rfc822EmbeddedProcessor {
             let mut file = NamedTempFile::new()?;
             std::io::copy(&mut part.contents(), &mut file)?;
 
-            let output = ProcessOutput::embedded(ctx, name, file.into_temp_path(), mimetype, checksum);
+            let output = ProcessOutput::embedded(&ctx, name, file.into_temp_path(), mimetype, checksum);
             ctx.add_output(Ok(output)).await?;
         }
 

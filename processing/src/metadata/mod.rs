@@ -11,7 +11,7 @@ pub struct DefaultMetadataProcessor;
 impl Process for DefaultMetadataProcessor {
     async fn process(
         &self,
-        ctx: &ProcessContext,
+        ctx: ProcessContext,
         input_path: &Path,
         output_path: TempPath,
         checksum: &str,
@@ -20,7 +20,7 @@ impl Process for DefaultMetadataProcessor {
             let mut metadata = tika().metadata(input_path).await?;
             tokio::fs::write(&output_path, &mut metadata).await?;
 
-            let output = ProcessOutput::processed(ctx, "metadata.json", output_path, "embedded/json", checksum);
+            let output = ProcessOutput::processed(&ctx, "metadata.json", output_path, "embedded/json", checksum);
             anyhow::Ok(output)
         }.await;
 

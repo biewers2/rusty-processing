@@ -4,8 +4,8 @@ use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use bytesize::MB;
 use tokio::io::{AsyncRead, AsyncReadExt};
+use crate::s3_client;
 
-use crate::services::s3_client;
 use crate::util::parse_s3_uri;
 
 pub struct MultipartUploader {

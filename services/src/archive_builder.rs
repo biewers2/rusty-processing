@@ -1,29 +1,9 @@
 use std::fs::File;
-use std::io::{Seek, Write};
+use std::io::{Read, Write};
 use std::path;
+use std::path::Path;
+
 use bytesize::MB;
-use tempfile::TempPath;
-
-use tokio::io::AsyncReadExt;
-
-/// Represents the contents of a file to be archived.
-///
-#[derive(Debug)]
-pub struct ArchiveEntry {
-    name: String,
-    path: TempPath,
-    id_chain: Vec<String>,
-}
-
-impl ArchiveEntry {
-    /// Create a new archive entry.
-    ///
-    /// This can be passed to [`ArchiveBuilder::append`] to add the file to an archive.
-    ///
-    pub fn new(name: String, path: TempPath, id_chain: Vec<String>) -> Self {
-        Self { name, path, id_chain }
-    }
-}
 
 /// A builder for creating an archive.
 ///
@@ -31,78 +11,46 @@ impl ArchiveEntry {
 ///
 pub struct ArchiveBuilder {
     zipper: zip::ZipWriter<File>,
-    size: usize,
-    current_path: Option<TempPath>,
 }
 
 impl ArchiveBuilder {
     /// Create a new archive builder.
     ///
-    pub fn new() -> anyhow::Result<Self> {
-        let file = tempfile::tempfile()?;
+    pub fn new(file: File) -> anyhow::Result<Self> {
         let zipper = zip::ZipWriter::new(file);
 
-        Ok(Self {
-            zipper,
-            size: 0,
-            current_path: None
-        })
+        Ok(Self { zipper })
     }
 
-    /// Append an entry to the archive.
+    /// Add a file to the archive.
     ///
-    pub async fn append(&mut self, entry: ArchiveEntry) -> anyhow::Result<()> {
-        let path = self.archive_entry_path(&entry.id_chain, &entry.name);
-        let path_parent = path.parent().ok_or(anyhow::anyhow!("No parent"))?;
+    /// # Arguments
+    ///
+    /// * `input_path` - The path to the file to add to the archive.
+    /// * `zip_path` - The path to the file in the archive.
+    ///
+    pub fn push(&mut self, input_path: impl AsRef<Path>, zip_path: impl AsRef<Path>) -> anyhow::Result<()> {
+        let zip_path_str = zip_path.as_ref().to_string_lossy();
+        self.zipper.start_file(zip_path_str, Default::default())?;
 
-        let path_string = path.to_string_lossy().to_string();
-        let base_path_string = path_parent.to_string_lossy().to_string();
-
-        self.zipper.add_directory(base_path_string, Default::default())?;
-        self.zipper.start_file(path_string, Default::default())?;
-        self.write_file(&entry.path).await?;
-
-        self.current_path = Some(entry.path);
-        self.size += 1;
+        let path = input_path.as_ref();
+        self.write_file(path)?;
 
         Ok(())
     }
 
     /// Build the archive.
     ///
-    /// # Returns
-    ///
-    /// If there is only one entry, a file handle representing the file of that entry is returned.
-    /// Otherwise, a file handle representing the archive is returned.
-    ///
-    pub fn build(&mut self) -> anyhow::Result<File> {
-        // Return the file if there is only one entry.
-        if self.size == 1 {
-            if let Some(path) = self.current_path.take() {
-                return Ok(File::open(path)?)
-            }
-        }
-
-        let mut file = self.zipper.finish()?;
-        file.rewind()?;
-        Ok(file)
+    pub fn build(&mut self) -> anyhow::Result<std::fs::File> {
+        Ok(self.zipper.finish()?)
     }
 
-    fn archive_entry_path(&self, embedded_id_chain: &[String], name: &str) -> path::PathBuf {
-        let mut path = path::PathBuf::new();
-        for id in embedded_id_chain {
-            path.push(id);
-        }
-        path.push(name);
-        path
-    }
-
-    async fn write_file(&mut self, path: &path::Path) -> anyhow::Result<()> {
-        let mut file = tokio::fs::File::open(path).await?;
+    fn write_file(&mut self, path: &path::Path) -> anyhow::Result<()> {
+        let mut file = std::fs::File::open(path)?;
 
         let mut buf = Box::new([0; MB as usize]);
         loop {
-            let bytes_read = file.read(buf.as_mut()).await?;
+            let bytes_read = file.read(buf.as_mut())?;
             if bytes_read == 0 {
                 break;
             }

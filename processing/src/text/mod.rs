@@ -14,14 +14,14 @@ pub struct DefaultTextProcessor;
 impl Process for DefaultTextProcessor {
     async fn process(
         &self,
-        ctx: &ProcessContext,
+        ctx: ProcessContext,
         input_path: &Path,
         output_path: TempPath,
         checksum: &str,
     ) -> anyhow::Result<()> {
         tika().text_into_file(input_path, &output_path).await?;
 
-        let output = ProcessOutput::processed(ctx, "extracted.txt", output_path, "text/plain", checksum);
+        let output = ProcessOutput::processed(&ctx, "extracted.txt", output_path, "text/plain", checksum);
         ctx.add_output(Ok(output)).await
     }
 

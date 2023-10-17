@@ -34,7 +34,7 @@ pub struct ZipEmbeddedProcessor;
 impl Process for ZipEmbeddedProcessor {
     async fn process(
         &self,
-        ctx: &ProcessContext,
+        ctx: ProcessContext,
         path:&Path,
         _: TempPath,
         _: &str,
@@ -55,13 +55,13 @@ impl Process for ZipEmbeddedProcessor {
         while let Some(result) = output_stream.next().await {
             match result {
                 Ok(NextArchiveEntry::File(entry)) => {
-                    info!("Discovered ZIP file {}", entry.name);
+                    info!("Discovered entry {}", entry.name);
                     let ArchiveEntry { name, path, checksum: dedupe_checksum, mimetype } = entry;
-                    let output = ProcessOutput::embedded(ctx, name, path, mimetype, dedupe_checksum);
+                    let output = ProcessOutput::embedded(&ctx, name, path, mimetype, dedupe_checksum);
                     ctx.add_output(Ok(output)).await?;
                 },
-                Ok(NextArchiveEntry::Dir(name)) => debug!("Discovered ZIP directory {}", name),
-                Err(e) => warn!("Failed to read ZIP entry: {}", e),
+                Ok(NextArchiveEntry::Dir(name)) => debug!("Discovered directory {}", name),
+                Err(e) => warn!("Failed to read entry: {}", e),
             }
         }
 
