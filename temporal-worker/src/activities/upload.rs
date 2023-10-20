@@ -1,15 +1,12 @@
-use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 use aws_sdk_s3::primitives::ByteStream;
-use bytesize::MB;
 use log::error;
 use serde::{Deserialize, Serialize};
 use tap::Tap;
 use temporal_sdk::ActContext;
 use tokio::io::AsyncReadExt;
 
-use crate::io::MultipartUploader;
 use crate::s3_client;
 use crate::util::parse_s3_uri;
 
@@ -29,14 +26,14 @@ pub struct UploadInput {
 /// Activity for uploading a file to S3.
 ///
 pub async fn upload(_ctx: ActContext, input: UploadInput) -> anyhow::Result<()> {
-    let mut file = tokio::fs::File::open(&input.path).await?;
+    let file = tokio::fs::File::open(&input.path).await?;
 
-    if file.metadata().await?.size() > MB * 10 {
-        let uploader = MultipartUploader::new(&input.s3_uri)?;
-        uploader.upload(&mut file).await
-    } else {
+    // if file.metadata().await?.size() > MB * 10 {
+    //     let uploader = MultipartUploader::new(&input.s3_uri)?;
+    //     uploader.upload(&mut file).await
+    // } else {
         upload_file(file, &input.s3_uri).await
-    }
+    // }
 }
 
 async fn upload_file(

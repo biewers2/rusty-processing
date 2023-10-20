@@ -20,7 +20,7 @@ impl Process for DefaultMetadataProcessor {
             let mut metadata = tika().metadata(input_path).await?;
             tokio::fs::write(&output_path, &mut metadata).await?;
 
-            let output = ProcessOutput::processed(&ctx, "metadata.json", output_path, "embedded/json", checksum);
+            let output = ProcessOutput::processed(&ctx, "metadata.json", output_path, "application/json", checksum);
             anyhow::Ok(output)
         }.await;
 

@@ -1,12 +1,12 @@
 use std::path;
-use std::path::{Path, PathBuf};
-use anyhow::anyhow;
+use std::path::PathBuf;
 
+use anyhow::anyhow;
 use clap::Parser;
 use lazy_static::lazy_static;
 use log::{debug, info, warn};
 use tap::Tap;
-use tempfile::{NamedTempFile, tempfile, TempPath};
+use tempfile::TempPath;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use processing::processing::{ProcessContextBuilder, processor, ProcessOutput, ProcessType};
@@ -121,7 +121,7 @@ pub async fn process(
         output_sink,
     ).build();
 
-    let processing = tokio::spawn(processor().process(ctx, input_path.into()));
+    let processing = tokio::spawn(processor().process(ctx, input_path));
     let output_handling = tokio::spawn(handle_outputs(
         outputs,
         archive_entry_sink,
@@ -130,7 +130,7 @@ pub async fn process(
     let archive = tokio::spawn(build_archive(archive_entries, output_path));
 
     processing.await?.map_err(|err| anyhow!(format!("{}", err)))?;
-    output_handling.await??;
+    output_handling.await?;
     info!("Finished processing file");
 
     archive.await??;
@@ -148,7 +148,7 @@ async fn handle_outputs(
     mut outputs: Receiver<anyhow::Result<ProcessOutput>>,
     archive_entry_sink: Sender<(TempPath, PathBuf)>,
     recurse: bool,
-) -> anyhow::Result<()> {
+) {
     let worker_pool = threadpool::ThreadPool::new(OUTPUT_HANDLING_THREADS);
 
     while let Some(output) = outputs.recv().await {
@@ -161,7 +161,6 @@ async fn handle_outputs(
     }
 
     worker_pool.join();
-    Ok(())
 }
 
 /// Regardless of if the metadata.json is normal or an embedded file, both will be used to create an archive entry and no additional

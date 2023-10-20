@@ -41,6 +41,10 @@ lazy_static! {
         s3::Client::new(&config)
     });
 
+    static ref REDIS: redis::Client = {
+        redis::Client::open(REDIS_ADDRESS.as_ref()).unwrap()
+    };
+
     static ref HOSTNAME: String = gethostname().to_string_lossy().to_string();
 
     static ref TEMPORAL_ADDRESS: String = format!(
@@ -48,10 +52,20 @@ lazy_static! {
         config().get_or("TEMPORAL_HOST", "localhost"),
         config().get_or("TEMPORAL_PORT", "7233"),
     );
+
+    static ref REDIS_ADDRESS: String = format!(
+        "redis://{}:{}",
+        config().get_or("REDIS_HOST", "localhost"),
+        config().get_or("REDIS_PORT", "6379"),
+    );
 }
 
 pub(crate) async fn s3_client() -> &'static s3::Client {
     S3_CLIENT.get().await
+}
+
+pub(crate) fn redis() -> &'static redis::Client {
+    &REDIS
 }
 
 pub(crate) fn hostname() -> &'static str {
@@ -113,7 +127,7 @@ pub async fn run_sticky_worker() -> anyhow::Result<()> {
     worker.register_activity("RemoveWorkspace", activities::remove_workspace);
     worker.register_activity("Download", activities::download);
     worker.register_activity("Upload", activities::upload);
-    worker.register_activity("ZipDirectory", activities::zip);
+    worker.register_activity("Zip", activities::zip);
     worker.run().await
 }
 

@@ -16,15 +16,13 @@ gethostname = "0.4"
 lazy_static = "1.4"
 log = "0.4"
 processing = { version = "0.1",  path = "../processing", features = ["mail"] }
+redis = { version = "0.23", features = ["streams", "tokio-comp"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 services = { version = "0.1", path = "../services" }
 simple_logger = "4.2"
 tap = "1.0"
 tempfile = "3.8"
-#temporal-sdk = { path = "../../../sdk-core/sdk" }
-#temporal-sdk-core = { path = "../../../sdk-core/core" }
-#temporal-sdk-core-api = { path = "../../../sdk-core/core-api" }
 temporal-sdk = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }
 temporal-sdk-core-api = { git = "https://github.com/temporalio/sdk-core.git", branch = "master" }

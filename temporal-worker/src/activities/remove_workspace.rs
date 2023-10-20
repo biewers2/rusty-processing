@@ -16,7 +16,7 @@ pub struct RemoveWorkspaceInput {
 pub async fn remove_workspace(_ctx: ActContext, input: RemoveWorkspaceInput) -> anyhow::Result<()> {
     input.paths.into_iter()
         .filter(|path| path.starts_with("/tmp"))
-        .map(|path| PathBuf::from(path))
+        .map(PathBuf::from)
         .try_for_each(|path| {
             if path.is_dir() {
                 std::fs::remove_dir_all(path)
